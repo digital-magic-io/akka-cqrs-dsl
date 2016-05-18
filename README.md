@@ -1,5 +1,5 @@
-# Akka-CQRS-DSL
-[![Build Status](https://travis-ci.org/digital-magic-io/Akka-CQRS-DSL.svg?branch=master)](https://travis-ci.org/digital-magic-io/Akka-CQRS-DSL)
+# akka-cqrs-dsl
+[![Build Status](https://travis-ci.org/digital-magic-io/akka-cqrs-dsl.svg?branch=master)](https://travis-ci.org/digital-magic-io/akka-cqrs-dsl)
 A convenient DSL for Command/Query Actor communication.
 
 # Usage
@@ -15,9 +15,9 @@ val actor = system.actorOf(ExampleActor.props())
 
 val num = 21
 val future = for {
-  tmp <- testService command SetValue(num)
-  _   <- testService command SetValue(num + tmp)
-  res <- testService query GetValue
+  tmp <- actor command SetValue(num)
+  _   <- actor command SetValue(num + tmp)
+  res <- actor query GetValue
 } yield res
 
 Await.result(future, 1 second) shouldBe 42
