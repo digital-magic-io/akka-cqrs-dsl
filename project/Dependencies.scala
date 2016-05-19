@@ -1,12 +1,10 @@
-import sbt.Keys._
 import sbt._
-
 
 object Dependencies {
 
   object Versions {
     val scala = "2.11.8"
-    val akka = "2.4.2"
+    val akka = "2.4.3"
     val scalaTest = "2.2.6"
   }
 
@@ -18,7 +16,7 @@ object Dependencies {
   )
 
   val dependencies = Seq(
-    "com.typesafe.akka" %% "akka-persistence" % Versions.akka,
+    "com.typesafe.akka" %% "akka-actor" % Versions.akka,
     "com.typesafe.akka" %% "akka-testkit" % Versions.akka % Test,
     "org.scalatest" %% "scalatest" % Versions.scalaTest % Test
   )
