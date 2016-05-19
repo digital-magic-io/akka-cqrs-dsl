@@ -5,7 +5,6 @@ import scala.reflect.ClassTag
 object API {
 
   trait ResponseError extends Throwable
-
   case object NotFound extends ResponseError
 
   type Result[T] = Either[ResponseError, T]
