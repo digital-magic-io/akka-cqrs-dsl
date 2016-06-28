@@ -4,7 +4,6 @@ import akka.actor._
 import akka.testkit.{ImplicitSender, TestKit}
 import com.typesafe.config.ConfigFactory
 import io.digitalmagic.akka.dsl.API._
-import io.digitalmagic.akka.dsl.DSL._
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
 import scala.concurrent.Await
@@ -19,6 +18,7 @@ object Domain {
   // commands
   case class SetValue(newValue: Int) extends API.Command[Int]
   case class BadCommand() extends API.Command[Int]
+  case class LongCommand(seconds: Int) extends API.Command[String]
 
   // response errors
   case object CouldNotExecute extends ResponseError
@@ -37,6 +37,7 @@ class TestApiService() extends Actor {
     case query@QueryValue() => sender() ! query.found(value)
     case command@SetValue(newValue) => sender() ! command.success(newValue); context.become(receive(newValue))
     case command@BadCommand() => sender() ! command.failure(CouldNotExecute)
+    case command@LongCommand(sleepFor) => Thread.sleep(sleepFor); sender ! command.success("ok");
   }
 }
 
@@ -71,6 +72,27 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
       } recover {
         case CouldNotExecute =>
         // handle
+      }
+
+      Await.result(future, 1 second)
+    }
+
+    "timeout properly" in {
+      val future = testService command LongCommand(500) withTimeout 100.milliseconds map { x =>
+        // should not execute
+        ???
+      } recover {
+        case e: akka.pattern.AskTimeoutException =>
+        // handle
+      }
+
+      Await.result(future, 1 second)
+    }
+
+    "don't timeout" in {
+      val future = testService command LongCommand(100) withTimeout 500.milliseconds map { x =>
+        // should not execute
+        x shouldBe "ok"
       }
 
       Await.result(future, 1 second)
