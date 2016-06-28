@@ -1,6 +1,10 @@
 package io.digitalmagic.akka.dsl
 
+import akka.actor.{ActorRef, ActorSelection}
+
+import scala.language.{implicitConversions, postfixOps}
 import scala.reflect.ClassTag
+import scala.util.Either
 
 object API {
 
@@ -32,6 +36,18 @@ object API {
     def found(value: T)(implicit tag: ClassTag[T]): QueryResult[T] = QueryResult(Right(value))
     def notFound(implicit tag: ClassTag[T]): QueryResult[T] = QueryResult(Left(NotFound))
     override def failure(error: ResponseError)(implicit tag: ClassTag[T]): QueryResult[T] = QueryResult(Left(error))
+  }
+
+  implicit class PimpedActorRef(val actorRef: ActorRef) {
+    def query[T](msg: Query[T])(implicit tag: ClassTag[T]) = DSL.QueryProcessor[T](Left(actorRef), msg)
+
+    def command[T](msg: Command[T])(implicit tag: ClassTag[T]) = DSL.CommandProcessor[T](Left(actorRef), msg)
+  }
+
+  implicit class PimpedActorSelection(val actorSelection: ActorSelection) {
+    def query[T](msg: Query[T])(implicit tag: ClassTag[T]) = DSL.QueryProcessor[T](Right(actorSelection), msg)
+
+    def command[T](msg: Command[T])(implicit tag: ClassTag[T]) = DSL.CommandProcessor[T](Right(actorSelection), msg)
   }
 
 }

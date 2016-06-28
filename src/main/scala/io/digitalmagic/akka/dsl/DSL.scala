@@ -13,21 +13,7 @@ import scala.util.Either
 
 object DSL {
 
-  implicit class PimpedActorRef(val actorRef: ActorRef) {
-    def query[T](msg: Query[T])(implicit tag: ClassTag[T]) = QueryProcessor[T](Left(actorRef), msg)
-
-    def command[T](msg: Command[T])(implicit tag: ClassTag[T]) = CommandProcessor[T](Left(actorRef), msg)
-  }
-
-  implicit class PimpedActorSelection(val actorSelection: ActorSelection) {
-    def query[T](msg: Query[T])(implicit tag: ClassTag[T]) = QueryProcessor[T](Right(actorSelection), msg)
-
-    def command[T](msg: Command[T])(implicit tag: ClassTag[T]) = CommandProcessor[T](Right(actorSelection), msg)
-  }
-
-  sealed case class QueryProcessor[T](whom: Either[ActorRef, ActorSelection], msg: Query[T])(implicit tag: ClassTag[T]) {
-
-    implicit val akkaTimeout: Timeout = 5 seconds
+  sealed case class QueryProcessor[T](whom: Either[ActorRef, ActorSelection], msg: Query[T])(implicit tag: ClassTag[T], val akkaTimeout: Timeout = 5 seconds) {
 
     private def path = whom fold(r => r.path, s => s.anchorPath)
 
@@ -50,9 +36,7 @@ object DSL {
     }
   }
 
-  sealed case class CommandProcessor[T](whom: Either[ActorRef, ActorSelection], msg: Command[T])(implicit tag: ClassTag[T]) {
-
-    implicit val akkaTimeout: Timeout = 5 seconds
+  sealed case class CommandProcessor[T](whom: Either[ActorRef, ActorSelection], msg: Command[T])(implicit tag: ClassTag[T], val akkaTimeout: Timeout = 5 seconds) {
 
     private def path = whom fold(r => r.path, s => s.anchorPath)
 
