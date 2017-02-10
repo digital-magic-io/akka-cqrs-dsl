@@ -1,10 +1,13 @@
-name := "akka-cqrs-dsl"
-
+name         := "akka-cqrs-dsl"
 organization := "io.digital-magic"
+version      := "1.2-SNAPSHOT"
+
 organizationHomepage := Some(url("http://www.digital-magic.io"))
-startYear := Some(2016)
-version := "1.1"
-scalaVersion := Dependencies.Versions.scala
+startYear            := Some(2016)
+
+scalaVersion       := Dependencies.Versions.scala211
+crossScalaVersions := Seq(Dependencies.Versions.scala211, Dependencies.Versions.scala212)
+
 scalacOptions ++= Seq(
   "-feature",
   "-deprecation",
@@ -15,5 +18,3 @@ scalacOptions ++= Seq(
 )
 
 libraryDependencies ++= Dependencies.dependencies
-
-resolvers ++= Dependencies.repos

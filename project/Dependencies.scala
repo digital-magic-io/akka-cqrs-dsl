@@ -3,21 +3,15 @@ import sbt._
 object Dependencies {
 
   object Versions {
-    val scala = "2.11.8"
-    val akka = "2.4.3"
-    val scalaTest = "2.2.6"
+    val scala211  = "2.11.8"
+    val scala212  = "2.12.1"
+    val akka      = "2.4.16"
+    val scalaTest = "3.0.1"
   }
 
-  val repos = Seq(
-    "Atlassian Releases" at "https://maven.atlassian.com/public/",
-    "JCenter repo" at "https://bintray.com/bintray/jcenter/",
-    Resolver.sonatypeRepo("snapshots"),
-    "google code" at "http://repo1.maven.org/maven2/com/googlecode/libphonenumber/libphonenumber/"
-  )
-
   val dependencies = Seq(
-    "com.typesafe.akka" %% "akka-actor" % Versions.akka,
-    "com.typesafe.akka" %% "akka-testkit" % Versions.akka % Test,
-    "org.scalatest" %% "scalatest" % Versions.scalaTest % Test
+    "com.typesafe.akka" %% "akka-actor"   % Versions.akka,
+    "com.typesafe.akka" %% "akka-testkit" % Versions.akka      % Test,
+    "org.scalatest"     %% "scalatest"    % Versions.scalaTest % Test
   )
 }
