@@ -5,11 +5,10 @@ A convenient DSL for Command/Query Actor communication.
 # Usage
 Simply add the appropriate `Command` or `Query` trait to your messages, and you're good to go:
 ```
-import io.digitalmagic.akka.dsl.API
-import io.digitalmagic.akka.dsl.DSL._
+import io.digitalmagic.akka.dsl.API._
 
-case object GetValue extends API.Query[Int]
-case class SetValue(newValue: Int) extends API.Command[Int]
+case object GetValue extends Query[Int]
+case class SetValue(newValue: Int) extends Command[Int]
 
 val actor = system.actorOf(ExampleActor.props())
 
