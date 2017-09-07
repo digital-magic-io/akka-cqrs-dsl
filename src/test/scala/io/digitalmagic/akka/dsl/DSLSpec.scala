@@ -45,9 +45,9 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
 
   def this() = this(ActorSystem("authx-test", ConfigFactory.load("akka-test.conf")))
 
-  lazy val testService = system.actorOf(TestApiService.props())
+  private lazy val testService = system.actorOf(TestApiService.props())
 
-  override def afterAll() = {
+  override def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)
   }
 
@@ -66,9 +66,8 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
     }
 
     "report errors" in {
-      val future = testService command BadCommand() map { x =>
-        // should not execute
-        ???
+      val future = testService command BadCommand() map { _ =>
+        fail("should not execute")
       } recover {
         case CouldNotExecute =>
         // handle
@@ -78,11 +77,10 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
     }
 
     "timeout properly" in {
-      val future = testService command LongCommand(500) withTimeout 100.milliseconds map { x =>
-        // should not execute
-        ???
+      val future = testService command LongCommand(500) withTimeout 100.milliseconds map { _ =>
+        fail("should not execute")
       } recover {
-        case e: akka.pattern.AskTimeoutException =>
+        case _: akka.pattern.AskTimeoutException =>
         // handle
       }
 
@@ -91,7 +89,6 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
 
     "don't timeout" in {
       val future = testService command LongCommand(100) withTimeout 500.milliseconds map { x =>
-        // should not execute
         x shouldBe "ok"
       }
 
