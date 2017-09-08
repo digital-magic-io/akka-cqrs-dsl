@@ -43,15 +43,15 @@ object API {
   }
 
   implicit class PimpedActorRef(val actorRef: ActorRef) {
-    def query[T](msg: Query[T])(implicit tag: ClassTag[T]) = QueryProcessor[T](Left(actorRef), msg)
+    def query[T](msg: Query[T])(implicit tag: ClassTag[T], akkaTimeout: Timeout = 5 seconds): QueryProcessor[T] = QueryProcessor[T](Left(actorRef), msg)
 
-    def command[T](msg: Command[T])(implicit tag: ClassTag[T]) = CommandProcessor[T](Left(actorRef), msg)
+    def command[T](msg: Command[T])(implicit tag: ClassTag[T], akkaTimeout: Timeout = 5 seconds): CommandProcessor[T] = CommandProcessor[T](Left(actorRef), msg)
   }
 
   implicit class PimpedActorSelection(val actorSelection: ActorSelection) {
-    def query[T](msg: Query[T])(implicit tag: ClassTag[T]) = QueryProcessor[T](Right(actorSelection), msg)
+    def query[T](msg: Query[T])(implicit tag: ClassTag[T], akkaTimeout: Timeout = 5 seconds): QueryProcessor[T] = QueryProcessor[T](Right(actorSelection), msg)
 
-    def command[T](msg: Command[T])(implicit tag: ClassTag[T]) = CommandProcessor[T](Right(actorSelection), msg)
+    def command[T](msg: Command[T])(implicit tag: ClassTag[T], akkaTimeout: Timeout = 5 seconds): CommandProcessor[T] = CommandProcessor[T](Right(actorSelection), msg)
   }
 
 

@@ -1,5 +1,7 @@
 package io.digitalmagic.akka.dsl
 
+import java.util.concurrent.TimeoutException
+
 import akka.actor._
 import akka.pattern._
 import akka.testkit.{ImplicitSender, TestKit}
@@ -21,7 +23,7 @@ object Domain {
   // commands
   case class SetValue(newValue: Int) extends API.Command[Int]
   case object BadCommand extends API.Command[Int]
-  case class LongCommand(seconds: Int) extends API.Command[String]
+  case class LongCommand(milliseconds: Int) extends API.Command[String]
   case class PipedSetValue(newValue: Int) extends API.Command[Int]
   case object PipedBadCommand extends API.Command[Int]
 
@@ -64,12 +66,25 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
 
   "An api query helper" must {
 
-    "respond to queries and commands" in {
+    "respond to queries and commands on actor ref" in {
       val magic = 15
       val future = for {
         valueJustSet <- testService command SetValue(magic)
         _            <- testService command SetValue(magic + valueJustSet)
         checkIt      <- testService query QueryValue
+      } yield {
+        checkIt
+      }
+
+      Await.result(future, 1 second) shouldBe magic * 2
+    }
+
+    "respond to queries and commands on actor selection" in {
+      val magic = 15
+      val future = for {
+        valueJustSet <- system.actorSelection(testService.path) command SetValue(magic)
+        _            <- system.actorSelection(testService.path) command SetValue(magic + valueJustSet)
+        checkIt      <- system.actorSelection(testService.path) query QueryValue
       } yield {
         checkIt
       }
@@ -88,6 +103,11 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
       Await.result(future, 1 second)
     }
 
+    "report errors on actor selection" in {
+      val future = system.actorSelection(testService.path) command BadCommand map identity
+      an [CouldNotExecute.type] should be thrownBy Await.result(future, 1 second)
+    }
+
     "timeout properly" in {
       val future = testService command LongCommand(500) withTimeout 100.milliseconds map { _ =>
         fail("should not execute")
@@ -99,12 +119,22 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
       Await.result(future, 1 second)
     }
 
+    "timeout properly on actor selection" in {
+      val future = system.actorSelection(testService.path) command LongCommand(500) withTimeout 100.milliseconds map identity
+      an [AskTimeoutException] should be thrownBy Await.result(future, 1 second)
+    }
+
     "don't timeout" in {
       val future = testService command LongCommand(100) withTimeout 500.milliseconds map { x =>
         x shouldBe "ok"
       }
 
       Await.result(future, 1 second)
+    }
+
+    "don't timeout on actor selection" in {
+      val future = system.actorSelection(testService.path) command LongCommand(100) withTimeout 500.milliseconds map identity
+      Await.result(future, 1 second) shouldBe "ok"
     }
 
     "support pipeTo" in {
@@ -144,6 +174,30 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
 
         an [CouldNotExecute.type] should be thrownBy Await.result(unsafe, 1 second)
         Await.result(safe, 1 second) shouldBe 42
+      }
+    }
+
+    "support global timeout override" in {
+      implicit val dslTimeout: Timeout = 300 milliseconds
+
+      locally {
+        val res = testService command LongCommand(100) map identity
+        Await.result(res, 1 second) shouldBe "ok"
+      }
+
+      locally {
+        val res = system.actorSelection(testService.path) command LongCommand(100) map identity
+        Await.result(res, 1 second) shouldBe "ok"
+      }
+
+      locally {
+        val res = testService command LongCommand(500) map identity
+        an [TimeoutException] should be thrownBy Await.result(res, 1 second)
+      }
+
+      locally {
+        val res = system.actorSelection(testService.path) command LongCommand(500) map identity
+        an [TimeoutException] should be thrownBy Await.result(res, 1 second)
       }
     }
   }
