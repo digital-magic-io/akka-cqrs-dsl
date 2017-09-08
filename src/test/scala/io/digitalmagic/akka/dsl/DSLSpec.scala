@@ -22,6 +22,8 @@ object Domain {
   case class SetValue(newValue: Int) extends API.Command[Int]
   case object BadCommand extends API.Command[Int]
   case class LongCommand(seconds: Int) extends API.Command[String]
+  case class PipedSetValue(newValue: Int) extends API.Command[Int]
+  case object PipedBadCommand extends API.Command[Int]
 
   // response errors
   case object CouldNotExecute extends ResponseError
@@ -44,7 +46,9 @@ class TestApiService() extends Actor {
     case command@SetValue(newValue) => sender() ! command.success(newValue); context.become(receive(newValue))
     case command@LongCommand(sleepFor) => context.system.scheduler.scheduleOnce(sleepFor millis, sender(), command.success("ok"))
     case BadCommand => sender() ! BadCommand.failure(CouldNotExecute)
-    case q@PipedEcho(expected) => expected.fold(e => Future.failed(e), v => Future.successful(q.found(v))).pipeTo(sender())
+    case query@PipedEcho(expected) => expected.fold(e => Future.failed(e), v => Future.successful(query.found(v))).pipeTo(sender())
+    case command@PipedSetValue(newValue) => self command SetValue(newValue) map command.success pipeTo sender()
+    case PipedBadCommand => self command BadCommand map identity pipeTo sender()
   }
 }
 
@@ -104,24 +108,43 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
     }
 
     "support pipeTo" in {
-      val result = testService query PipedEcho(Right(7)) map identity
-      Await.result(result, 1 second) shouldBe 7
+      locally {
+        val result = testService query PipedEcho(Right(7)) map identity
+        Await.result(result, 1 second) shouldBe 7
+      }
+
+      locally {
+        val result = testService command PipedSetValue(42) map identity
+        Await.result(result, 1 second) shouldBe 42
+      }
     }
 
     "support failed pipeTo" in {
-      implicit val t: Timeout = 1 second
+      locally {
+        implicit val t: Timeout = 1 second
 
-      val x = testService ? PipedEcho(Left(BadQuery))
-      val y = x recover { case BadQuery => 42 }
+        val x = testService ? PipedEcho(Left(BadQuery))
+        val y = x recover { case BadQuery => 42 }
 
-      an [BadQuery.type] should be thrownBy Await.result(x, 1 second)
-      Await.result(y, 1 second) shouldBe 42
+        an [BadQuery.type] should be thrownBy Await.result(x, 1 second)
+        Await.result(y, 1 second) shouldBe 42
+      }
 
-      val unsafe = testService query PipedEcho(Left(BadQuery)) map identity
-      val safe = unsafe recover { case BadQuery => 42 }
+      locally {
+        val unsafe = testService query PipedEcho(Left(BadQuery)) map identity
+        val safe = unsafe recover { case BadQuery => 42 }
 
-      an [BadQuery.type] should be thrownBy Await.result(unsafe, 1 second)
-      Await.result(safe, 1 second) shouldBe 42
+        an [BadQuery.type] should be thrownBy Await.result(unsafe, 1 second)
+        Await.result(safe, 1 second) shouldBe 42
+      }
+
+      locally {
+        val unsafe = testService command  PipedBadCommand map identity
+        val safe = unsafe recover { case CouldNotExecute => 42 }
+
+        an [CouldNotExecute.type] should be thrownBy Await.result(unsafe, 1 second)
+        Await.result(safe, 1 second) shouldBe 42
+      }
     }
   }
 }
