@@ -17,11 +17,11 @@ object API {
 
   type Result[T] = Either[ResponseError, T]
 
-  trait Response[T] {
+  trait Response[T] extends Serializable {
     def value: Either[ResponseError, T]
   }
 
-  trait Request[T] {
+  trait Request[T] extends Serializable {
     type Result <: Response[T]
     def failure(error: ResponseError)(implicit tag: ClassTag[T]): Result
   }
