@@ -1,6 +1,6 @@
 name         := "akka-cqrs-dsl"
 organization := "io.digital-magic"
-version      := "1.4-SNAPSHOT"
+version      := "1.4"
 
 organizationHomepage := Some(url("http://www.digital-magic.io"))
 startYear            := Some(2016)
