@@ -18,7 +18,7 @@
 
   "files":
   [
-    {"includePattern": "target/scala.*/akka-cqrs-dsl_2\\.(\\d+).*\\.jar", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl_2.$1"}
+    {"includePattern": "target/scala(.*)/akka-cqrs-dsl_2\\.(\\d+)(.*)\\.jar", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl_2.$2"}
   ],
   "publish": true
 }
