@@ -1,0 +1,24 @@
+{
+  "package": {
+    "name": "akka-cqrs-dsl",
+    "repo": "releases",
+    "subject": "digital-magic",
+    "desc": "Deploy from Travis-CI",
+    "website_url": "www.digital-magic.io",
+    "issue_tracker_url": "https://github.com/digital-magic-io/akka-cqrs-dsl/issues",
+    "vcs_url": "https://github.com/digital-magic-io/akka-cqrs-dsl.git",
+    "github_use_tag_release_notes": false,
+    "licenses": ["Apache 2.0"],
+    "labels": ["akka", "cqrs"]
+  },
+
+  "version": {
+    "name": "1.4"
+  },
+
+  "files":
+  [
+    {"includePattern": "target/scala-(.*)/.*\\.jar", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl_$1"}
+  ],
+  "publish": true
+}
