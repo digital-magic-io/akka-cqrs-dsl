@@ -18,8 +18,8 @@
 
   "files":
   [
-    {"includePattern": "target/scala-2.11/(.*)jar$", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl_2.11"},
-    {"includePattern": "target/scala-2.12/(.*)jar$", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl_2.12"}
+    {"includePattern": "target/scala-2.11/(.*)jar$", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl_2.11/1.4/"},
+    {"includePattern": "target/scala-2.12/(.*)jar$", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl_2.12/1.4/"}
   ],
   "publish": true
 }
