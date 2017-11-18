@@ -1,7 +1,7 @@
 {
   "package": {
     "name": "akka-cqrs-dsl",
-    "repo": "releases",
+    "repo": "digital-magic",
     "subject": "digital-magic",
     "desc": "Deploy from Travis-CI",
     "website_url": "www.digital-magic.io",
