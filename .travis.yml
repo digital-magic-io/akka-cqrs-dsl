@@ -5,7 +5,7 @@ scala:
 - 2.11.11
 - 2.12.6
 script:
-- sbt ++$TRAVIS_SCALA_VERSION test packageBin packageDoc packageSrc
+- sbt ++$TRAVIS_SCALA_VERSION test packageBin packageDoc packageSrc packagedArtifacts
 deploy:
   provider: bintray
   file: ".bintray.json"
