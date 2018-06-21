@@ -19,7 +19,9 @@
   "files":
   [
     {"includePattern": "target/scala-2.11/(.*\.jar)", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl_2.11/1.5/$1"},
-    {"includePattern": "target/scala-2.12/(.*\.jar)", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl_2.12/1.5/$1"}
+    {"includePattern": "target/scala-2.11/(.*\.pom)", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl_2.11/1.5/$1"},
+    {"includePattern": "target/scala-2.12/(.*\.jar)", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl_2.12/1.5/$1"},
+    {"includePattern": "target/scala-2.12/(.*\.pom)", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl_2.12/1.5/$1"}
   ],
   "publish": true
 }
