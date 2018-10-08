@@ -71,8 +71,6 @@ object API {
       }
     }
 
-    def withFilter[R](p: T => Boolean): Future[R] = Future.failed(new NotImplementedError)
-
     def flatMap[R](f: T => Future[R])(implicit executor: ExecutionContext): Future[R] = {
       whom fold(r => r ? msg, s => s ? msg) flatMap {
         case QueryResult(Right(x: T)) => f(x)
@@ -97,8 +95,6 @@ object API {
         case z => throw new IllegalArgumentException(s"$path ? $msg replied with unexpected $z")
       }
     }
-
-    def withFilter[R](p: T => Boolean): Future[R] = Future.failed(new NotImplementedError)
 
     def flatMap[R](f: T => Future[R])(implicit executor: ExecutionContext): Future[R] = {
       whom fold(r => r ? msg, s => s ? msg) flatMap {
