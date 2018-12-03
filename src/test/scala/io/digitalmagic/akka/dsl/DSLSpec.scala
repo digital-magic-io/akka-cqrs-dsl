@@ -3,17 +3,19 @@ package io.digitalmagic.akka.dsl
 import java.util.concurrent.TimeoutException
 
 import akka.actor._
+import akka.cluster.Cluster
+import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings}
+import akka.fixes.ClusterShardingExts.implicits._
 import akka.pattern._
 import akka.testkit.{ImplicitSender, TestKit}
 import akka.util.Timeout
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 import io.digitalmagic.akka.dsl.API._
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 object Domain {
   // queries
@@ -56,7 +58,10 @@ class TestApiService() extends Actor {
 
 class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender with WordSpecLike with Matchers with BeforeAndAfterAll {
 
-  def this() = this(ActorSystem("authx-test", ConfigFactory.load("akka-test.conf")))
+  def this() = this(ActorSystem("api-test", ConfigFactory.load("akka-test.conf")
+    .withValue("akka.actor.provider", ConfigValueFactory.fromAnyRef("akka.cluster.ClusterActorRefProvider"))
+  ))
+  Cluster(system).join(Address("tcp", system.name))
 
   private lazy val testService = system.actorOf(TestApiService.props())
 
@@ -200,5 +205,72 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
         an [TimeoutException] should be thrownBy Await.result(res, 1 second)
       }
     }
+
+    "support program interpretation" in {
+      implicit val actor1Api = Actor1.interpreter(system.actorSelection("/user/actor1"))
+      implicit val actor2Api = Actor2.interpreter(system.actorSelection("/user/actor2"))
+
+      val actor1 = system.actorOf(Actor1.props, "actor1")
+      val actor2 = system.actorOf(Actor2.props, "actor2")
+      val adder = system.actorOf(Adder.props, "adder")
+
+      val future = for {
+        _     <- actor1 command Actor1.SetValue(5)
+        _     <- actor2 command Actor2.SetValue(10)
+        value <- adder command Adder.QueryAndAdd
+      } yield value
+
+      Await.result(future, 1 second) shouldBe 15
+    }
+
+    "support unique indexes" in {
+      import IndexExample._
+
+      implicit val index1 = new ActorBasedUniqueIndex[index1Api.type] {
+        override def entityActor: ActorSelection = system.actorSelection("system/sharding/example")
+        override def indexActor: ActorSelection = system.actorSelection("system/sharding/index1")
+      }
+
+      implicit val index2 = new ActorBasedUniqueIndex[index2Api.type] {
+        override def entityActor: ActorSelection = system.actorSelection("system/sharding/example")
+        override def indexActor: ActorSelection = system.actorSelection("system/sharding/index2")
+      }
+
+      val clusterSharding = ClusterSharding(system)
+      val clusterShardingSettings = ClusterShardingSettings(system)
+      val shardAllocationStrategy = clusterSharding.defaultShardAllocationStrategy(clusterShardingSettings)
+
+      UniqueIndexActorDef(index1Api, "index1").start(clusterSharding, clusterShardingSettings)
+      UniqueIndexActorDef(index2Api, "index2").start(clusterSharding, clusterShardingSettings)
+
+      clusterSharding.startProperly(
+        typeName = "example",
+        entityIdToEntityProps = IndexExampleActor.props,
+        settings = clusterShardingSettings,
+        extractEntityId = IndexExampleActor.extractEntityId,
+        extractShardId = IndexExampleActor.extractShardId,
+        allocationStrategy = shardAllocationStrategy,
+        handOffStopMessage = EventSourcedActorWithInterpreter.Stop
+      )
+
+      {
+        val resp = index1.entityActor command IndexExample.AcquireCommand("e1", false) map identity
+        Await.result(resp, 3 seconds) shouldBe (())
+      }
+
+      val entityId = {
+        val resp = index1.indexActor query index1Api.GetEntityId("abc") map identity
+        val optionEntityId = Await.result(resp, 3 seconds)
+        optionEntityId shouldBe Some("e1")
+        optionEntityId.get
+      }
+
+      {
+        val resp = index1.entityActor command IndexExample.ReleaseCommand(entityId) map identity
+        Await.result(resp, 3 seconds) shouldBe (())
+      }
+
+      Await.result(index1.indexActor query index1Api.GetEntityId("abc") map identity, 3 seconds) shouldBe None
+     }
   }
 }

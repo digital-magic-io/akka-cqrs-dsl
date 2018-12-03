@@ -1,12 +1,19 @@
 name         := "akka-cqrs-dsl"
 organization := "io.digital-magic"
-version      := "1.5"  // don't forget to bump version in .bintray.json
+version      := "2.0-M1"  // don't forget to bump version in .bintray.json
 
 organizationHomepage := Some(url("http://www.digital-magic.io"))
 startYear            := Some(2016)
 
-scalaVersion       := Dependencies.Versions.scala211
-crossScalaVersions := Seq(Dependencies.Versions.scala211, Dependencies.Versions.scala212)
+scalaVersion       := Dependencies.Versions.scala212
+crossScalaVersions := Seq(Dependencies.Versions.scala212)
+
+parallelExecution in Test := false
+
+resolvers += Resolver.sonatypeRepo("releases")
+
+addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
+addCompilerPlugin("org.spire-math" % "kind-projector" % "0.9.8" cross CrossVersion.binary)
 
 scalacOptions ++= Seq(
   "-feature",
@@ -14,7 +21,10 @@ scalacOptions ++= Seq(
   "-unchecked",
   "-language:reflectiveCalls",
   "-language:postfixOps",
-  "-language:implicitConversions"
+  "-language:implicitConversions",
+  "-language:higherKinds",
+  "-Ypartial-unification"
 )
 
 libraryDependencies ++= Dependencies.dependencies
+libraryDependencies ++= scalaVersion(sv => Dependencies.scalaReflect(sv)).value

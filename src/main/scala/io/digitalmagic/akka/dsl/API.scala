@@ -3,10 +3,11 @@ package io.digitalmagic.akka.dsl
 import akka.actor.{ActorRef, ActorSelection}
 import akka.pattern.ask
 import akka.util.Timeout
+import scalaz._
+import Scalaz._
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
-import scala.language.{implicitConversions, postfixOps}
 import scala.reflect.ClassTag
 import scala.util.Either
 
@@ -14,32 +15,45 @@ object API {
 
   trait ResponseError extends Throwable
   case object NotFound extends ResponseError
+  case class InternalError(cause: Throwable) extends ResponseError
 
   type Result[T] = Either[ResponseError, T]
 
-  trait Response[T] extends Serializable {
+  trait Response[T] extends Product with Serializable {
     def value: Either[ResponseError, T]
   }
 
-  trait Request[T] extends Serializable {
+  trait Request[T] extends Product with Serializable {
     type Result <: Response[T]
-    def failure(error: ResponseError)(implicit tag: ClassTag[T]): Result
+    def success(value: T): Result
+    def failure(error: ResponseError): Result
   }
 
-  case class CommandResult[T](override val value: Either[ResponseError, T])(implicit tag: ClassTag[T]) extends Response[T]
-  case class QueryResult[T](override val value: Either[ResponseError, T])(implicit tag: ClassTag[T]) extends Response[T]
+  case class CommandResult[T](override val value: Either[ResponseError, T]) extends Response[T]
+  case class QueryResult[T](override val value: Either[ResponseError, T]) extends Response[T]
 
   trait Command[T] extends Request[T] {
     override type Result = CommandResult[T]
-    def success(value: T)(implicit tag: ClassTag[T]): CommandResult[T] = CommandResult(Right(value))
-    override def failure(error: ResponseError)(implicit tag: ClassTag[T]): CommandResult[T] = CommandResult(Left(error))
+    override def success(value: T): CommandResult[T] = CommandResult(Right(value))
+    override def failure(error: ResponseError): CommandResult[T] = CommandResult(Left(error))
   }
 
   trait Query[T] extends Request[T] {
     override type Result = QueryResult[T]
-    def found(value: T)(implicit tag: ClassTag[T]): QueryResult[T] = QueryResult(Right(value))
-    def notFound(implicit tag: ClassTag[T]): QueryResult[T] = QueryResult(Left(NotFound))
-    override def failure(error: ResponseError)(implicit tag: ClassTag[T]): QueryResult[T] = QueryResult(Left(error))
+    def found(value: T): QueryResult[T] = QueryResult(Right(value))
+    def notFound: QueryResult[T] =  QueryResult(Left(NotFound))
+    override def success(value: T): QueryResult[T] = found(value)
+    override def failure(error: ResponseError): QueryResult[T] = QueryResult(Left(error))
+  }
+
+  case class QueryFuture[T](f: ExecutionContext => Future[T]) extends Function[ExecutionContext, Future[T]] {
+    override def apply(ec: ExecutionContext): Future[T] = f(ec)
+  }
+
+  object QueryFuture {
+    implicit def queryFutureFunctor: Functor[QueryFuture] = new Functor[QueryFuture] {
+      override def map[A, B](fa: QueryFuture[A])(f: A => B): QueryFuture[B] = QueryFuture(implicit ec => fa(ec).map(f))
+    }
   }
 
   implicit class PimpedActorRef(val actorRef: ActorRef) {
@@ -78,7 +92,11 @@ object API {
         case z => Future.failed(new IllegalArgumentException(s"$path ? $msg replied with unexpected $z"))
       }
     }
+
+    def asFuture: QueryFuture[T] = QueryFuture(implicit ex => map(identity))
   }
+
+  implicit def queryProcessorToFuture[T](queryProcessor: QueryProcessor[T]): QueryFuture[T] = queryProcessor.asFuture
 
   sealed case class CommandProcessor[T](whom: Either[ActorRef, ActorSelection], msg: Command[T])(implicit tag: ClassTag[T], val akkaTimeout: Timeout = 5 seconds) {
 
