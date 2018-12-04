@@ -21,15 +21,17 @@ object UniqueIndexApi {
   def getApiIdFor(api: UniqueIndexApi): String = currentMirror.reflect(api).symbol.fullName
   def getApiById(id: String): UniqueIndexApi = currentMirror.reflectModule(currentMirror.staticModule(id)).instance.asInstanceOf[UniqueIndexApi]
 
-  abstract class Base[E: StringRepresentable, V: StringRepresentable] extends UniqueIndexApi {
+  abstract class Base[E, V](dummy: Int, E: StringRepresentable[E], V: StringRepresentable[V]) extends UniqueIndexApi {
     Self: Singleton =>
+    private[UniqueIndexApi] def this() = this(0, null, null) // we need this constructor for java serialization
+    def this()(implicit E: StringRepresentable[E], V: StringRepresentable[V]) = this(0, E, V)
     type ClientQueryType[T] = ClientQuery[T]
     type ValueType = V
     type IndexApiType[T] = IndexApi[T]
     type EntityIdType = E
     type ClientEventType = ClientEvent
-    override def valueTypeToString: StringRepresentable[V] = implicitly
-    override def entityIdToString: StringRepresentable[E] = implicitly
+    override def valueTypeToString: StringRepresentable[V] = V
+    override def entityIdToString: StringRepresentable[E] = E
   }
 }
 
