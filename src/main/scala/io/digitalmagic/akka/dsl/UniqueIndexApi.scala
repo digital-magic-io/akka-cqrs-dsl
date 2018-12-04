@@ -33,7 +33,7 @@ object UniqueIndexApi {
   }
 }
 
-case class ClientIndexesStateMap private(map: Map[UniqueIndexApi, UniqueIndexApi#ClientIndexesState] = Map.empty[UniqueIndexApi, UniqueIndexApi#ClientIndexesState]) extends AnyVal {
+case class ClientIndexesStateMap private(map: Map[UniqueIndexApi, UniqueIndexApi#ClientIndexesState] = Map.empty[UniqueIndexApi, UniqueIndexApi#ClientIndexesState]) {
   def get[A <: UniqueIndexApi](api: A): Option[api.ClientIndexesState] =
     map.get(api).asInstanceOf[Option[api.ClientIndexesState]]
 
@@ -175,17 +175,17 @@ trait UniqueIndexApi {
     override type EventType = ServerEvent
     def reflect: Api.UniqueIndexServerState = this
   }
-  case object FreeServerState extends UniqueIndexServerState
+  case class FreeServerState() extends UniqueIndexServerState
   case class UnconfirmedServerState(key: EntityIdType) extends UniqueIndexServerState
   case class AcquiredServerState(key: EntityIdType) extends UniqueIndexServerState
 
   val uniqueIndexState: PersistentStateProcessor[UniqueIndexServerState] = new PersistentStateProcessor[UniqueIndexServerState] {
-    override def empty: UniqueIndexServerState = FreeServerState
+    override def empty: UniqueIndexServerState = FreeServerState()
     override def process(state: UniqueIndexServerState, event: ServerEvent): UniqueIndexServerState = (state, event) match {
-      case (FreeServerState,             AcquisitionStartedServerEvent(key)) => UnconfirmedServerState(key)
+      case (FreeServerState(),           AcquisitionStartedServerEvent(key)) => UnconfirmedServerState(key)
       case (UnconfirmedServerState(_),   AcquisitionStartedServerEvent(key)) => AcquiredServerState(key)
       case (UnconfirmedServerState(key), AcquisitionCompletedServerEvent())  => AcquiredServerState(key)
-      case (UnconfirmedServerState(_),   ReleaseCompletedServerEvent())      => FreeServerState
+      case (UnconfirmedServerState(_),   ReleaseCompletedServerEvent())      => FreeServerState()
       case (AcquiredServerState(key),    ReleaseStartedServerEvent())        => UnconfirmedServerState(key)
       case _ => sys.error("should not happen")
     }

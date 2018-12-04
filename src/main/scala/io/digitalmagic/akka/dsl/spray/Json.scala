@@ -1,7 +1,8 @@
 package io.digitalmagic.akka.dsl.spray
 
+import java.time.Instant
+
 import io.digitalmagic.akka.dsl.{ClientIndexesStateMap, EventSourcedActorWithInterpreter, PersistentState, UniqueIndexApi}
-import org.joda.time.{DateTime, Instant}
 import spray.json._
 
 private object JsonHelper {
@@ -61,7 +62,7 @@ private object JsonHelper {
   val UnconfirmedServerStateName = "UnconfirmedServerState"
   val AcquiredServerStateName = "AcquiredServerState"
 
-  @inline implicit def freeServerStateFormat[I <: UniqueIndexApi](implicit api: I):        RootJsonFormat[api.FreeServerState.type]   = jsonFormat0(() => api.FreeServerState)
+  @inline implicit def freeServerStateFormat[I <: UniqueIndexApi](implicit api: I):        RootJsonFormat[api.FreeServerState]        = jsonFormat0(api.FreeServerState)
   @inline implicit def unconfirmedServerStateFormat[I <: UniqueIndexApi](implicit api: I): RootJsonFormat[api.UnconfirmedServerState] = jsonFormat1(api.UnconfirmedServerState)
   @inline implicit def acquiredServerStateFormat[I <: UniqueIndexApi](implicit api: I):    RootJsonFormat[api.AcquiredServerState]    = jsonFormat1(api.AcquiredServerState)
 
@@ -93,7 +94,6 @@ private object JsonHelper {
     }
   }
 
-  // UniqueIndexApi#ClientIndexesState
   @inline implicit def clientIndexesStateFormat[I <: UniqueIndexApi](implicit api: I): JsonFormat[api.ClientIndexesState] = new JsonFormat[api.ClientIndexesState] {
     override def read(json: JsValue): api.ClientIndexesState = {
       val fields = json.asJsObject.fields
@@ -133,9 +133,9 @@ private object JsonHelper {
 object Json extends DefaultJsonProtocol {
   import JsonHelper._
 
-  implicit object DateTimeJsonFormat extends RootJsonFormat[DateTime] {
-    def read(json: JsValue): DateTime = Instant.parse(json.convertTo[String]).toDateTime
-    def write(obj: DateTime) = JsString(new Instant(obj).toString)
+  implicit object InstantJsonFormat extends RootJsonFormat[Instant] {
+    def read(json: JsValue): Instant = Instant.parse(json.convertTo[String])
+    def write(obj: Instant) = JsString(obj.toString)
   }
 
   implicit val apiFormat: JsonFormat[UniqueIndexApi] = new JsonFormat[UniqueIndexApi] {
@@ -160,7 +160,7 @@ object Json extends DefaultJsonProtocol {
         case ReleaseAbortedClientEventName       => value.convertTo[ReleaseAbortedClientEvent]
         case other                               => deserializationError(s"unknown client event type: $other")
       }
-      result.timestamp = fields("timestamp").convertTo[DateTime]
+      result.timestamp = fields("timestamp").convertTo[Instant]
       result
     }
 
@@ -198,7 +198,7 @@ object Json extends DefaultJsonProtocol {
     }
 
     override def write(obj: ClientIndexesStateMap): JsValue = {
-      JsObject(obj.map.map { case (k, v) =>
+      JsObject(obj.map.map { case (_, v) =>
         UniqueIndexApi.getApiIdFor(v.Api) -> clientIndexesStateFormat(v.Api).write(v.reflect)
       })
     }
@@ -272,7 +272,7 @@ object Json extends DefaultJsonProtocol {
         case ReleaseCompletedServerEventName     => value.convertTo[ReleaseCompletedServerEvent]
         case other                               => deserializationError(s"unknown server event type: $other")
       }
-      result.timestamp = fields("timestamp").convertTo[DateTime]
+      result.timestamp = fields("timestamp").convertTo[Instant]
       result
     }
 
@@ -305,7 +305,7 @@ object Json extends DefaultJsonProtocol {
       import Api._
 
       fields("type").convertTo[String] match {
-        case FreeServerStateName        => value.convertTo[FreeServerState.type]
+        case FreeServerStateName        => value.convertTo[FreeServerState]
         case UnconfirmedServerStateName => value.convertTo[UnconfirmedServerState]
         case AcquiredServerStateName    => value.convertTo[AcquiredServerState]
         case other                      => deserializationError(s"unknown server state type: $other")
@@ -317,7 +317,7 @@ object Json extends DefaultJsonProtocol {
       import obj.Api._
 
       val (stateType, value) = obj.reflect match {
-        case FreeServerState           => (FreeServerStateName,        FreeServerState.toJson)
+        case s: FreeServerState        => (FreeServerStateName,        s.toJson)
         case s: UnconfirmedServerState => (UnconfirmedServerStateName, s.toJson)
         case s: AcquiredServerState    => (AcquiredServerStateName,    s.toJson)
       }

@@ -49,7 +49,7 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
     _     <- log(_.debug(s"looking up entity id for [$value]"))
     state  <- get
     result <- state match {
-      case FreeServerState => pure(None)
+      case FreeServerState() => pure(None)
       case UnconfirmedServerState(key) =>
         askAndLog[Option[indexApi.EntityIdType]](key, value) {
           case IsIndexNeededResponse.No => for {
@@ -68,7 +68,7 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
     _     <- log(_.debug(s"starting [$value] acquisition for [$key]"))
     state <- get
     _     <- state match {
-      case FreeServerState => emit(_ => AcquisitionStartedServerEvent(key))
+      case FreeServerState() => emit(_ => AcquisitionStartedServerEvent(key))
       case UnconfirmedServerState(occupyingKey) if key == occupyingKey => pure(())
       case UnconfirmedServerState(occupyingKey) if key != occupyingKey =>
         askAndLog[Unit](occupyingKey, value) {
@@ -84,7 +84,7 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
     _     <- log(_.debug(s"committing [$entityId] acquisition for [$key]"))
     state <- get
     _     <- state match {
-      case FreeServerState => raiseError(IndexIsFree(key, indexValue))
+      case FreeServerState() => raiseError(IndexIsFree(key, indexValue))
       case UnconfirmedServerState(occupyingKey) if key == occupyingKey => emit(_ => AcquisitionCompletedServerEvent())
       case UnconfirmedServerState(occupyingKey) if key != occupyingKey => raiseError(EntityIdMismatch(occupyingKey, key, indexValue))
       case AcquiredServerState(occupyingKey) if key == occupyingKey => pure(())
@@ -96,7 +96,7 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
     _     <- log(_.debug(s"rolling back [$entityId] acquisition for [$key]"))
     state <- get
     _     <- state match {
-      case FreeServerState => pure(())
+      case FreeServerState() => pure(())
       case UnconfirmedServerState(occupyingKey) if key == occupyingKey => emit(_ => ReleaseCompletedServerEvent())
       case UnconfirmedServerState(occupyingKey) if key != occupyingKey => raiseError(EntityIdMismatch(occupyingKey, key, indexValue))
       case AcquiredServerState(occupyingKey) if key == occupyingKey => raiseError(IndexIsAcquired(key, indexValue))
@@ -108,7 +108,7 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
     _     <- log(_.debug(s"starting [$entityId] release for [$key]"))
     state <- get
     _     <- state match {
-      case FreeServerState => raiseError(IndexIsFree(key, indexValue))
+      case FreeServerState() => raiseError(IndexIsFree(key, indexValue))
       case UnconfirmedServerState(occupyingKey) if key == occupyingKey => pure(())
       case UnconfirmedServerState(occupyingKey) if key != occupyingKey => raiseError(EntityIdMismatch(occupyingKey, key, indexValue))
       case AcquiredServerState(occupyingKey) if key == occupyingKey => emit(_ => ReleaseStartedServerEvent())
@@ -120,7 +120,7 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
     _     <- log(_.debug(s"committing [$entityId] release for [$key]"))
     state <- get
     _     <- state match {
-      case FreeServerState => pure(())
+      case FreeServerState() => pure(())
       case UnconfirmedServerState(occupyingKey) if key == occupyingKey => emit(_ => ReleaseCompletedServerEvent())
       case UnconfirmedServerState(occupyingKey) if key != occupyingKey => raiseError(EntityIdMismatch(occupyingKey, key, indexValue))
       case AcquiredServerState(_) => raiseError(IndexIsAcquired(key, indexValue))
@@ -131,7 +131,7 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
     _     <- log(_.debug(s"rolling back [$entityId] release for [$key]"))
     state <- get
     _     <- state match {
-      case FreeServerState => raiseError(IndexIsFree(key, indexValue))
+      case FreeServerState() => raiseError(IndexIsFree(key, indexValue))
       case UnconfirmedServerState(occupyingKey) if key == occupyingKey => emit(_ => AcquisitionCompletedServerEvent())
       case UnconfirmedServerState(occupyingKey) if key != occupyingKey => raiseError(EntityIdMismatch(occupyingKey, key, indexValue))
       case AcquiredServerState(occupyingKey) if key == occupyingKey => pure(())

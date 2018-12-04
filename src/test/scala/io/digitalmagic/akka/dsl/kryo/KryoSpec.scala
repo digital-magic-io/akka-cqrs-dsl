@@ -1,13 +1,13 @@
-package io.digitalmagic.akka.dsl.spray
+package io.digitalmagic.akka.dsl.kryo
 
+import com.esotericsoftware.kryo.Kryo
+import com.esotericsoftware.kryo.io.{Input, Output}
 import io.digitalmagic.akka.dsl.EventSourcedActorWithInterpreter.EventSourcedActorState
-import io.digitalmagic.akka.dsl._
+import io.digitalmagic.akka.dsl.{ClientIndexesStateMap, Event, PersistentState, UniqueIndexApi}
+import org.objenesis.strategy.StdInstantiatorStrategy
 import org.scalatest.{Matchers, WordSpecLike}
-import _root_.spray.json._
 
-object JsonSpec {
-  import DefaultJsonProtocol._
-
+object KryoSpec {
   implicit object api1 extends UniqueIndexApi.Base[String, String]
   implicit object api2 extends UniqueIndexApi.Base[Int, Int]
 
@@ -15,50 +15,42 @@ object JsonSpec {
   case class MyState(n: Int) extends PersistentState {
     override type EventType = MyEvent
   }
-
-  implicit val myStateFormat: JsonFormat[MyState] = new JsonFormat[MyState] {
-    override def read(json: JsValue): MyState = MyState(json.asJsObject().fields("n").convertTo[Int])
-    override def write(obj: MyState): JsValue = JsObject("n" -> obj.n.toJson)
-  }
-
-  val stateFormat: JsonFormat[PersistentState] = new JsonFormat[PersistentState] {
-    override def read(json: JsValue): PersistentState = {
-      val fields = json.asJsObject.fields
-      fields("type").convertTo[String] match {
-        case "MyState" => fields("value").convertTo[MyState]
-        case other     => deserializationError(s"unknown stat type $other")
-      }
-    }
-    override def write(obj: PersistentState): JsValue = {
-      val (stateType, value) = obj match {
-        case s: MyState => ("MyState", s.toJson)
-        case s => serializationError(s"unknown state class: ${s.getClass}")
-      }
-      JsObject(
-        "type" -> stateType.toJson,
-        "value" -> value
-      )
-    }
-  }
 }
 
-class JsonSpec extends WordSpecLike with Matchers {
-  import Json._
-  import JsonSpec._
+class KryoSpec extends WordSpecLike with Matchers {
+  import KryoSpec._
 
-  "spray-json for ClientEvent" must {
+  val kryo = new Kryo()
+  val instStrategy = kryo.getInstantiatorStrategy.asInstanceOf[Kryo.DefaultInstantiatorStrategy]
+  instStrategy.setFallbackInstantiatorStrategy(new StdInstantiatorStrategy())
+  kryo.setInstantiatorStrategy(instStrategy)
+
+  UniqueIndexApiSerializer.registerSerializers(kryo)
+
+  def write(obj: Any): Array[Byte] = {
+    val output = new Output(1024, -1)
+    kryo.writeClassAndObject(output, obj)
+    output.toBytes
+  }
+
+  def read[T](arr: Array[Byte]): T = {
+    val input = new Input(arr)
+    kryo.readClassAndObject(input).asInstanceOf[T]
+  }
+
+  "kryo for ClientEvent" must {
     "support serializing AcquisitionStartedClientEvent" in {
       {
         val event = api1.AcquisitionStartedClientEvent("test")
-        val serialized = clientEventFormat.write(event)
-        val deserialized = clientEventFormat.read(serialized)
+        val serialized = write(event)
+        val deserialized = read[api1.AcquisitionStartedClientEvent](serialized)
         deserialized shouldBe event
       }
 
       {
         val event = api2.AcquisitionStartedClientEvent(42)
-        val serialized = clientEventFormat.write(event)
-        val deserialized = clientEventFormat.read(serialized)
+        val serialized = write(event)
+        val deserialized = read[api2.AcquisitionStartedClientEvent](serialized)
         deserialized shouldBe event
       }
     }
@@ -66,15 +58,15 @@ class JsonSpec extends WordSpecLike with Matchers {
     "support serializing AcquisitionCompletedClientEvent" in {
       {
         val event = api1.AcquisitionCompletedClientEvent("test")
-        val serialized = clientEventFormat.write(event)
-        val deserialized = clientEventFormat.read(serialized)
+        val serialized = write(event)
+        val deserialized = read[api1.AcquisitionCompletedClientEvent](serialized)
         deserialized shouldBe event
       }
 
       {
         val event = api2.AcquisitionCompletedClientEvent(42)
-        val serialized = clientEventFormat.write(event)
-        val deserialized = clientEventFormat.read(serialized)
+        val serialized = write(event)
+        val deserialized = read[api2.AcquisitionCompletedClientEvent](serialized)
         deserialized shouldBe event
       }
     }
@@ -82,15 +74,15 @@ class JsonSpec extends WordSpecLike with Matchers {
     "support serializing AcquisitionAbortedClientEvent" in {
       {
         val event = api1.AcquisitionAbortedClientEvent("test")
-        val serialized = clientEventFormat.write(event)
-        val deserialized = clientEventFormat.read(serialized)
+        val serialized = write(event)
+        val deserialized = read[api1.AcquisitionAbortedClientEvent](serialized)
         deserialized shouldBe event
       }
 
       {
         val event = api2.AcquisitionAbortedClientEvent(42)
-        val serialized = clientEventFormat.write(event)
-        val deserialized = clientEventFormat.read(serialized)
+        val serialized = write(event)
+        val deserialized = read[api2.AcquisitionAbortedClientEvent](serialized)
         deserialized shouldBe event
       }
     }
@@ -98,15 +90,15 @@ class JsonSpec extends WordSpecLike with Matchers {
     "support serializing ReleaseStartedClientEvent" in {
       {
         val event = api1.ReleaseStartedClientEvent("test")
-        val serialized = clientEventFormat.write(event)
-        val deserialized = clientEventFormat.read(serialized)
+        val serialized = write(event)
+        val deserialized = read[api1.ReleaseStartedClientEvent](serialized)
         deserialized shouldBe event
       }
 
       {
         val event = api2.ReleaseStartedClientEvent(42)
-        val serialized = clientEventFormat.write(event)
-        val deserialized = clientEventFormat.read(serialized)
+        val serialized = write(event)
+        val deserialized = read[api2.ReleaseStartedClientEvent](serialized)
         deserialized shouldBe event
       }
     }
@@ -114,15 +106,15 @@ class JsonSpec extends WordSpecLike with Matchers {
     "support serializing ReleaseCompletedClientEvent" in {
       {
         val event = api1.ReleaseCompletedClientEvent("test")
-        val serialized = clientEventFormat.write(event)
-        val deserialized = clientEventFormat.read(serialized)
+        val serialized = write(event)
+        val deserialized = read[api1.ReleaseCompletedClientEvent](serialized)
         deserialized shouldBe event
       }
 
       {
         val event = api2.ReleaseCompletedClientEvent(42)
-        val serialized = clientEventFormat.write(event)
-        val deserialized = clientEventFormat.read(serialized)
+        val serialized = write(event)
+        val deserialized = read[api2.ReleaseCompletedClientEvent](serialized)
         deserialized shouldBe event
       }
     }
@@ -130,45 +122,45 @@ class JsonSpec extends WordSpecLike with Matchers {
     "support serializing ReleaseAbortedClientEvent" in {
       {
         val event = api1.ReleaseAbortedClientEvent("test")
-        val serialized = clientEventFormat.write(event)
-        val deserialized = clientEventFormat.read(serialized)
+        val serialized = write(event)
+        val deserialized = read[api1.ReleaseAbortedClientEvent](serialized)
         deserialized shouldBe event
       }
 
       {
         val event = api2.ReleaseAbortedClientEvent(42)
-        val serialized = clientEventFormat.write(event)
-        val deserialized = clientEventFormat.read(serialized)
+        val serialized = write(event)
+        val deserialized = read[api2.ReleaseAbortedClientEvent](serialized)
         deserialized shouldBe event
       }
     }
   }
 
-  "spray-json for EventSourcedActorState" must {
+  "kryo for EventSourcedActorState" must {
     "support serializing EventSourcedActorState" in {
       val state = EventSourcedActorState(MyState(1), ClientIndexesStateMap(Map(
         api1 -> api1.ClientIndexesState(Map("abc" -> api1.AcquisitionPendingClientState(), "def" -> api1.ReleasePendingClientState(), "ghi" -> api1.AcquiredClientState())),
         api2 -> api2.ClientIndexesState(Map(1 -> api2.AcquisitionPendingClientState(), 2 -> api2.ReleasePendingClientState(), 3 -> api2.AcquiredClientState()))
       )))
-      val serialized = clientStateFormat(stateFormat).write(state)
-      val deserialized = clientStateFormat(stateFormat).read(serialized)
+      val serialized = write(state)
+      val deserialized = read[EventSourcedActorState[MyState]](serialized)
       deserialized shouldBe state
     }
   }
 
-  "spray-json for Error" must {
+  "kryo for Error" must {
     "support serializing DuplicateIndex" in {
       {
         val error = api1.DuplicateIndex("key", "value")
-        val serialized = errorFormat.write(error)
-        val deserialized = errorFormat.read(serialized)
+        val serialized = write(error)
+        val deserialized = read[api1.DuplicateIndex](serialized)
         deserialized shouldBe error
       }
 
       {
         val error = api2.DuplicateIndex(41, 42)
-        val serialized = errorFormat.write(error)
-        val deserialized = errorFormat.read(serialized)
+        val serialized = write(error)
+        val deserialized = read[api2.DuplicateIndex](serialized)
         deserialized shouldBe error
       }
     }
@@ -176,15 +168,15 @@ class JsonSpec extends WordSpecLike with Matchers {
     "support serializing IndexIsFree" in {
       {
         val error = api1.IndexIsFree("key", "value")
-        val serialized = errorFormat.write(error)
-        val deserialized = errorFormat.read(serialized)
+        val serialized = write(error)
+        val deserialized = read[api1.IndexIsFree](serialized)
         deserialized shouldBe error
       }
 
       {
         val error = api2.IndexIsFree(41, 42)
-        val serialized = errorFormat.write(error)
-        val deserialized = errorFormat.read(serialized)
+        val serialized = write(error)
+        val deserialized = read[api2.IndexIsFree](serialized)
         deserialized shouldBe error
       }
     }
@@ -192,15 +184,15 @@ class JsonSpec extends WordSpecLike with Matchers {
     "support serializing IndexIsAcquired" in {
       {
         val error = api1.IndexIsAcquired("key", "value")
-        val serialized = errorFormat.write(error)
-        val deserialized = errorFormat.read(serialized)
+        val serialized = write(error)
+        val deserialized = read[api1.IndexIsAcquired](serialized)
         deserialized shouldBe error
       }
 
       {
         val error = api2.IndexIsAcquired(41, 42)
-        val serialized = errorFormat.write(error)
-        val deserialized = errorFormat.read(serialized)
+        val serialized = write(error)
+        val deserialized = read[api2.IndexIsAcquired](serialized)
         deserialized shouldBe error
       }
     }
@@ -208,34 +200,33 @@ class JsonSpec extends WordSpecLike with Matchers {
     "support serializing EntityIdMismatch" in {
       {
         val error = api1.EntityIdMismatch("occupyingKey", "requestedKey", "value")
-        val serialized = errorFormat.write(error)
-        val deserialized = errorFormat.read(serialized)
+        val serialized = write(error)
+        val deserialized = read[api1.EntityIdMismatch](serialized)
         deserialized shouldBe error
       }
 
       {
         val error = api2.EntityIdMismatch(41, 42, 43)
-        val serialized = errorFormat.write(error)
-        val deserialized = errorFormat.read(serialized)
+        val serialized = write(error)
+        val deserialized = read[api2.EntityIdMismatch](serialized)
         deserialized shouldBe error
       }
     }
-
   }
 
-  "spray-json for ServerEvent" must {
+  "kryo for ServerEvent" must {
     "support serializing AcquisitionStartedServerEvent" in {
       {
-        val event = api1.AcquisitionStartedServerEvent("test")
-        val serialized = serverEventFormat.write(event)
-        val deserialized = serverEventFormat.read(serialized)
+        val event = api1.AcquisitionStartedServerEvent("key")
+        val serialized = write(event)
+        val deserialized = read[api1.AcquisitionStartedServerEvent](serialized)
         deserialized shouldBe event
       }
 
       {
         val event = api2.AcquisitionStartedServerEvent(42)
-        val serialized = serverEventFormat.write(event)
-        val deserialized = serverEventFormat.read(serialized)
+        val serialized = write(event)
+        val deserialized = read[api2.AcquisitionStartedServerEvent](serialized)
         deserialized shouldBe event
       }
     }
@@ -243,15 +234,15 @@ class JsonSpec extends WordSpecLike with Matchers {
     "support serializing AcquisitionCompletedServerEvent" in {
       {
         val event = api1.AcquisitionCompletedServerEvent()
-        val serialized = serverEventFormat.write(event)
-        val deserialized = serverEventFormat.read(serialized)
+        val serialized = write(event)
+        val deserialized = read[api1.AcquisitionCompletedServerEvent](serialized)
         deserialized shouldBe event
       }
 
       {
         val event = api2.AcquisitionCompletedServerEvent()
-        val serialized = serverEventFormat.write(event)
-        val deserialized = serverEventFormat.read(serialized)
+        val serialized = write(event)
+        val deserialized = read[api2.AcquisitionCompletedServerEvent](serialized)
         deserialized shouldBe event
       }
     }
@@ -259,15 +250,15 @@ class JsonSpec extends WordSpecLike with Matchers {
     "support serializing ReleaseStartedServerEvent" in {
       {
         val event = api1.ReleaseStartedServerEvent()
-        val serialized = serverEventFormat.write(event)
-        val deserialized = serverEventFormat.read(serialized)
+        val serialized = write(event)
+        val deserialized = read[api1.ReleaseStartedServerEvent](serialized)
         deserialized shouldBe event
       }
 
       {
         val event = api2.ReleaseStartedServerEvent()
-        val serialized = serverEventFormat.write(event)
-        val deserialized = serverEventFormat.read(serialized)
+        val serialized = write(event)
+        val deserialized = read[api2.ReleaseStartedServerEvent](serialized)
         deserialized shouldBe event
       }
     }
@@ -275,33 +266,33 @@ class JsonSpec extends WordSpecLike with Matchers {
     "support serializing ReleaseCompletedServerEvent" in {
       {
         val event = api1.ReleaseCompletedServerEvent()
-        val serialized = serverEventFormat.write(event)
-        val deserialized = serverEventFormat.read(serialized)
+        val serialized = write(event)
+        val deserialized = read[api1.ReleaseCompletedServerEvent](serialized)
         deserialized shouldBe event
       }
 
       {
         val event = api2.ReleaseCompletedServerEvent()
-        val serialized = serverEventFormat.write(event)
-        val deserialized = serverEventFormat.read(serialized)
+        val serialized = write(event)
+        val deserialized = read[api2.ReleaseCompletedServerEvent](serialized)
         deserialized shouldBe event
       }
     }
   }
 
-  "spray-json for ServerState" must {
+  "kryo for ServerState" must {
     "support serializing FreeServerState" in {
       {
         val state = api1.FreeServerState()
-        val serialized = serverStateFormat.write(state)
-        val deserialized = serverStateFormat.read(serialized)
+        val serialized = write(state)
+        val deserialized = read[api1.FreeServerState](serialized)
         deserialized shouldBe state
       }
 
       {
         val state = api2.FreeServerState()
-        val serialized = serverStateFormat.write(state)
-        val deserialized = serverStateFormat.read(serialized)
+        val serialized = write(state)
+        val deserialized = read[api2.FreeServerState](serialized)
         deserialized shouldBe state
       }
     }
@@ -309,15 +300,15 @@ class JsonSpec extends WordSpecLike with Matchers {
     "support serializing UnconfirmedServerState" in {
       {
         val state = api1.UnconfirmedServerState("key")
-        val serialized = serverStateFormat.write(state)
-        val deserialized = serverStateFormat.read(serialized)
+        val serialized = write(state)
+        val deserialized = read[api1.UnconfirmedServerState](serialized)
         deserialized shouldBe state
       }
 
       {
         val state = api2.UnconfirmedServerState(42)
-        val serialized = serverStateFormat.write(state)
-        val deserialized = serverStateFormat.read(serialized)
+        val serialized = write(state)
+        val deserialized = read[api2.UnconfirmedServerState](serialized)
         deserialized shouldBe state
       }
     }
@@ -325,33 +316,33 @@ class JsonSpec extends WordSpecLike with Matchers {
     "support serializing AcquiredServerState" in {
       {
         val state = api1.AcquiredServerState("key")
-        val serialized = serverStateFormat.write(state)
-        val deserialized = serverStateFormat.read(serialized)
+        val serialized = write(state)
+        val deserialized = read[api1.AcquiredServerState](serialized)
         deserialized shouldBe state
       }
 
       {
         val state = api2.AcquiredServerState(42)
-        val serialized = serverStateFormat.write(state)
-        val deserialized = serverStateFormat.read(serialized)
+        val serialized = write(state)
+        val deserialized = read[api2.AcquiredServerState](serialized)
         deserialized shouldBe state
       }
     }
   }
 
-  "spray-json for UniqueIndexRequest" must {
+  "kryo for UniqueIndexRequest" must {
     "support serializing GetEntityId" in {
       {
         val request = api1.GetEntityId("value")
-        val serialized = uniqueIndexRequestFormat.write(request)
-        val deserialized = uniqueIndexRequestFormat.read(serialized)
+        val serialized = write(request)
+        val deserialized = read[api1.GetEntityId](serialized)
         deserialized shouldBe request
       }
 
       {
         val request = api2.GetEntityId(42)
-        val serialized = uniqueIndexRequestFormat.write(request)
-        val deserialized = uniqueIndexRequestFormat.read(serialized)
+        val serialized = write(request)
+        val deserialized = read[api2.GetEntityId](serialized)
         deserialized shouldBe request
       }
     }
@@ -359,15 +350,15 @@ class JsonSpec extends WordSpecLike with Matchers {
     "support serializing StartAcquisition" in {
       {
         val request = api1.StartAcquisition("key", "value")
-        val serialized = uniqueIndexRequestFormat.write(request)
-        val deserialized = uniqueIndexRequestFormat.read(serialized)
+        val serialized = write(request)
+        val deserialized = read[api1.StartAcquisition](serialized)
         deserialized shouldBe request
       }
 
       {
         val request = api2.StartAcquisition(41, 42)
-        val serialized = uniqueIndexRequestFormat.write(request)
-        val deserialized = uniqueIndexRequestFormat.read(serialized)
+        val serialized = write(request)
+        val deserialized = read[api2.StartAcquisition](serialized)
         deserialized shouldBe request
       }
     }
@@ -375,15 +366,15 @@ class JsonSpec extends WordSpecLike with Matchers {
     "support serializing CommitAcquisition" in {
       {
         val request = api1.CommitAcquisition("key", "value")
-        val serialized = uniqueIndexRequestFormat.write(request)
-        val deserialized = uniqueIndexRequestFormat.read(serialized)
+        val serialized = write(request)
+        val deserialized = read[api1.CommitAcquisition](serialized)
         deserialized shouldBe request
       }
 
       {
         val request = api2.CommitAcquisition(41, 42)
-        val serialized = uniqueIndexRequestFormat.write(request)
-        val deserialized = uniqueIndexRequestFormat.read(serialized)
+        val serialized = write(request)
+        val deserialized = read[api2.CommitAcquisition](serialized)
         deserialized shouldBe request
       }
     }
@@ -391,15 +382,15 @@ class JsonSpec extends WordSpecLike with Matchers {
     "support serializing RollbackAcquisition" in {
       {
         val request = api1.RollbackAcquisition("key", "value")
-        val serialized = uniqueIndexRequestFormat.write(request)
-        val deserialized = uniqueIndexRequestFormat.read(serialized)
+        val serialized = write(request)
+        val deserialized = read[api1.RollbackAcquisition](serialized)
         deserialized shouldBe request
       }
 
       {
         val request = api2.RollbackAcquisition(41, 42)
-        val serialized = uniqueIndexRequestFormat.write(request)
-        val deserialized = uniqueIndexRequestFormat.read(serialized)
+        val serialized = write(request)
+        val deserialized = read[api2.RollbackAcquisition](serialized)
         deserialized shouldBe request
       }
     }
@@ -407,15 +398,15 @@ class JsonSpec extends WordSpecLike with Matchers {
     "support serializing StartRelease" in {
       {
         val request = api1.StartRelease("key", "value")
-        val serialized = uniqueIndexRequestFormat.write(request)
-        val deserialized = uniqueIndexRequestFormat.read(serialized)
+        val serialized = write(request)
+        val deserialized = read[api1.StartRelease](serialized)
         deserialized shouldBe request
       }
 
       {
         val request = api2.StartRelease(41, 42)
-        val serialized = uniqueIndexRequestFormat.write(request)
-        val deserialized = uniqueIndexRequestFormat.read(serialized)
+        val serialized = write(request)
+        val deserialized = read[api2.StartRelease](serialized)
         deserialized shouldBe request
       }
     }
@@ -423,15 +414,15 @@ class JsonSpec extends WordSpecLike with Matchers {
     "support serializing CommitRelease" in {
       {
         val request = api1.CommitRelease("key", "value")
-        val serialized = uniqueIndexRequestFormat.write(request)
-        val deserialized = uniqueIndexRequestFormat.read(serialized)
+        val serialized = write(request)
+        val deserialized = read[api1.CommitRelease](serialized)
         deserialized shouldBe request
       }
 
       {
         val request = api2.CommitRelease(41, 42)
-        val serialized = uniqueIndexRequestFormat.write(request)
-        val deserialized = uniqueIndexRequestFormat.read(serialized)
+        val serialized = write(request)
+        val deserialized = read[api2.CommitRelease](serialized)
         deserialized shouldBe request
       }
     }
@@ -439,18 +430,17 @@ class JsonSpec extends WordSpecLike with Matchers {
     "support serializing RollbackRelease" in {
       {
         val request = api1.RollbackRelease("key", "value")
-        val serialized = uniqueIndexRequestFormat.write(request)
-        val deserialized = uniqueIndexRequestFormat.read(serialized)
+        val serialized = write(request)
+        val deserialized = read[api1.RollbackRelease](serialized)
         deserialized shouldBe request
       }
 
       {
         val request = api2.RollbackRelease(41, 42)
-        val serialized = uniqueIndexRequestFormat.write(request)
-        val deserialized = uniqueIndexRequestFormat.read(serialized)
+        val serialized = write(request)
+        val deserialized = read[api2.RollbackRelease](serialized)
         deserialized shouldBe request
       }
     }
-
   }
 }

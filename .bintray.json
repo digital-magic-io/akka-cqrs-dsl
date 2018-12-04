@@ -13,13 +13,13 @@
   },
 
   "version": {
-    "name": "2.0-M1"
+    "name": "2.0-M2"
   },
 
   "files":
   [
-    {"includePattern": "target/scala-2.12/(.*\.jar)", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl_2.12/2.0-M1/$1"},
-    {"includePattern": "target/scala-2.12/(.*).pom","uploadPattern": "/io/digital-magic/akka-cqrs-dsl_2.12/2.0-M1/$1.pom"}
+    {"includePattern": "target/scala-2.12/(.*\.jar)", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl_2.12/2.0-M2/$1"},
+    {"includePattern": "target/scala-2.12/(.*).pom","uploadPattern": "/io/digital-magic/akka-cqrs-dsl_2.12/2.0-M2/$1.pom"}
   ],
   "publish": true
 }

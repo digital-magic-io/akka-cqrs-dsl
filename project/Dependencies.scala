@@ -6,7 +6,6 @@ object Dependencies {
     val scala212                = "2.12.7"
     val scalaz                  = "7.2.27"
     val iotaz                   = "0.3.10"
-    val jodaTime                = "2.9.9"
     val simulacrum              = "0.14.0"
     val sparyJson               = "1.3.5"
     val kryoVersion             = "4.0.2"
@@ -20,7 +19,6 @@ object Dependencies {
   val dependencies = Seq(
     "org.scalaz"                 %% "scalaz-core"               % Versions.scalaz,
     "io.frees"                   %% "iotaz-core"                % Versions.iotaz,
-    "joda-time"                  %  "joda-time"                 % Versions.jodaTime,
     "com.github.mpilquist"       %% "simulacrum"                % Versions.simulacrum,
     "io.spray"                   %% "spray-json"                % Versions.sparyJson,
     "com.esotericsoftware"       %  "kryo"                      % Versions.kryoVersion,
