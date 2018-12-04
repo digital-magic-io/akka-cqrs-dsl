@@ -220,7 +220,7 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
         value <- adder command Adder.QueryAndAdd
       } yield value
 
-      Await.result(future, 1 second) shouldBe 15
+      Await.result(future, 3 seconds) shouldBe 15
     }
 
     "support unique indexes" in {
