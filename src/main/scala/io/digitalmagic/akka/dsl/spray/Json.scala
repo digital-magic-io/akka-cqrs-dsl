@@ -16,12 +16,12 @@ private object JsonHelper {
     override def write(obj: api.EntityIdType): JsValue = JsString(api.entityIdToString.asString(obj))
   }
 
-  @inline implicit def valueFormat[I <: UniqueIndexApi](implicit api: I): JsonFormat[api.ValueType] = new JsonFormat[api.ValueType] {
-    override def read(json: JsValue): api.ValueType = api.valueTypeToString.fromString(json.convertTo[String]) match {
+  @inline implicit def keyFormat[I <: UniqueIndexApi](implicit api: I): JsonFormat[api.KeyType] = new JsonFormat[api.KeyType] {
+    override def read(json: JsValue): api.KeyType = api.keyToString.fromString(json.convertTo[String]) match {
       case Some(v) => v
       case None => deserializationError(s"illegal value type: $json")
     }
-    override def write(obj: api.ValueType): JsValue = JsString(api.valueTypeToString.asString(obj))
+    override def write(obj: api.KeyType): JsValue = JsString(api.keyToString.asString(obj))
   }
 
   val AcquisitionStartedClientEventName   = "AcquisitionStartedClientEvent"
@@ -98,7 +98,7 @@ private object JsonHelper {
     override def read(json: JsValue): api.ClientIndexesState = {
       val fields = json.asJsObject.fields
       api.ClientIndexesState(fields.map { case (k, v) =>
-        api.valueTypeToString.fromString(k) match {
+        api.keyToString.fromString(k) match {
           case Some(value) => value -> v.convertTo[api.ClientIndexState]
           case None => deserializationError(s"illegal value type: $k")
         }
@@ -107,7 +107,7 @@ private object JsonHelper {
 
     override def write(obj: api.ClientIndexesState): JsValue = {
       JsObject(obj.map.map { case (k, v) =>
-        api.valueTypeToString.asString(k) -> v.toJson
+        api.keyToString.asString(k) -> v.toJson
       })
     }
   }

@@ -151,7 +151,7 @@ class KryoSpec extends WordSpecLike with Matchers {
   "kryo for Error" must {
     "support serializing DuplicateIndex" in {
       {
-        val error = api1.DuplicateIndex("key", "value")
+        val error = api1.DuplicateIndex("entityId", "key")
         val serialized = write(error)
         val deserialized = read[api1.DuplicateIndex](serialized)
         deserialized shouldBe error
@@ -167,7 +167,7 @@ class KryoSpec extends WordSpecLike with Matchers {
 
     "support serializing IndexIsFree" in {
       {
-        val error = api1.IndexIsFree("key", "value")
+        val error = api1.IndexIsFree("entityId", "key")
         val serialized = write(error)
         val deserialized = read[api1.IndexIsFree](serialized)
         deserialized shouldBe error
@@ -183,7 +183,7 @@ class KryoSpec extends WordSpecLike with Matchers {
 
     "support serializing IndexIsAcquired" in {
       {
-        val error = api1.IndexIsAcquired("key", "value")
+        val error = api1.IndexIsAcquired("entityId", "key")
         val serialized = write(error)
         val deserialized = read[api1.IndexIsAcquired](serialized)
         deserialized shouldBe error
@@ -199,7 +199,7 @@ class KryoSpec extends WordSpecLike with Matchers {
 
     "support serializing EntityIdMismatch" in {
       {
-        val error = api1.EntityIdMismatch("occupyingKey", "requestedKey", "value")
+        val error = api1.EntityIdMismatch("occupyingEntityId", "requestedEntityId", "key")
         val serialized = write(error)
         val deserialized = read[api1.EntityIdMismatch](serialized)
         deserialized shouldBe error
@@ -217,7 +217,7 @@ class KryoSpec extends WordSpecLike with Matchers {
   "kryo for ServerEvent" must {
     "support serializing AcquisitionStartedServerEvent" in {
       {
-        val event = api1.AcquisitionStartedServerEvent("key")
+        val event = api1.AcquisitionStartedServerEvent("entityId")
         val serialized = write(event)
         val deserialized = read[api1.AcquisitionStartedServerEvent](serialized)
         deserialized shouldBe event
@@ -299,7 +299,7 @@ class KryoSpec extends WordSpecLike with Matchers {
 
     "support serializing UnconfirmedServerState" in {
       {
-        val state = api1.UnconfirmedServerState("key")
+        val state = api1.UnconfirmedServerState("entityId")
         val serialized = write(state)
         val deserialized = read[api1.UnconfirmedServerState](serialized)
         deserialized shouldBe state
@@ -315,7 +315,7 @@ class KryoSpec extends WordSpecLike with Matchers {
 
     "support serializing AcquiredServerState" in {
       {
-        val state = api1.AcquiredServerState("key")
+        val state = api1.AcquiredServerState("entityId")
         val serialized = write(state)
         val deserialized = read[api1.AcquiredServerState](serialized)
         deserialized shouldBe state
@@ -333,7 +333,7 @@ class KryoSpec extends WordSpecLike with Matchers {
   "kryo for UniqueIndexRequest" must {
     "support serializing GetEntityId" in {
       {
-        val request = api1.GetEntityId("value")
+        val request = api1.GetEntityId("key")
         val serialized = write(request)
         val deserialized = read[api1.GetEntityId](serialized)
         deserialized shouldBe request
@@ -349,7 +349,7 @@ class KryoSpec extends WordSpecLike with Matchers {
 
     "support serializing StartAcquisition" in {
       {
-        val request = api1.StartAcquisition("key", "value")
+        val request = api1.StartAcquisition("entityId", "key")
         val serialized = write(request)
         val deserialized = read[api1.StartAcquisition](serialized)
         deserialized shouldBe request
@@ -365,7 +365,7 @@ class KryoSpec extends WordSpecLike with Matchers {
 
     "support serializing CommitAcquisition" in {
       {
-        val request = api1.CommitAcquisition("key", "value")
+        val request = api1.CommitAcquisition("entityId", "key")
         val serialized = write(request)
         val deserialized = read[api1.CommitAcquisition](serialized)
         deserialized shouldBe request
@@ -381,7 +381,7 @@ class KryoSpec extends WordSpecLike with Matchers {
 
     "support serializing RollbackAcquisition" in {
       {
-        val request = api1.RollbackAcquisition("key", "value")
+        val request = api1.RollbackAcquisition("entityId", "key")
         val serialized = write(request)
         val deserialized = read[api1.RollbackAcquisition](serialized)
         deserialized shouldBe request
@@ -397,7 +397,7 @@ class KryoSpec extends WordSpecLike with Matchers {
 
     "support serializing StartRelease" in {
       {
-        val request = api1.StartRelease("key", "value")
+        val request = api1.StartRelease("entityId", "key")
         val serialized = write(request)
         val deserialized = read[api1.StartRelease](serialized)
         deserialized shouldBe request
@@ -413,7 +413,7 @@ class KryoSpec extends WordSpecLike with Matchers {
 
     "support serializing CommitRelease" in {
       {
-        val request = api1.CommitRelease("key", "value")
+        val request = api1.CommitRelease("entityId", "key")
         val serialized = write(request)
         val deserialized = read[api1.CommitRelease](serialized)
         deserialized shouldBe request
@@ -429,7 +429,7 @@ class KryoSpec extends WordSpecLike with Matchers {
 
     "support serializing RollbackRelease" in {
       {
-        val request = api1.RollbackRelease("key", "value")
+        val request = api1.RollbackRelease("entityId", "key")
         val serialized = write(request)
         val deserialized = read[api1.RollbackRelease](serialized)
         deserialized shouldBe request

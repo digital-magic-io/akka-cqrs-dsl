@@ -75,7 +75,7 @@ trait IndexExample extends EventSourcedPrograms {
 
 object IndexExampleActor {
   def extractEntityId: ExtractEntityId = {
-    case msg: UniqueIndexApi#ClientQuery[_] => (msg.Api.entityIdToString.asString(msg.reflect.key), msg)
+    case msg: UniqueIndexApi#ClientQuery[_] => (msg.Api.entityIdToString.asString(msg.reflect.entityId), msg)
     case msg: IndexExample.AcquireCommand => (msg.entityId, msg)
     case msg: IndexExample.ReleaseCommand => (msg.entityId, msg)
   }

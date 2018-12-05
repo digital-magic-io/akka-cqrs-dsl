@@ -25,7 +25,7 @@ object JsonSpec {
     override def read(json: JsValue): PersistentState = {
       val fields = json.asJsObject.fields
       fields("type").convertTo[String] match {
-        case "MyState" => fields("value").convertTo[MyState]
+        case "MyState" => fields("key").convertTo[MyState]
         case other     => deserializationError(s"unknown stat type $other")
       }
     }
@@ -36,7 +36,7 @@ object JsonSpec {
       }
       JsObject(
         "type" -> stateType.toJson,
-        "value" -> value
+        "key" -> value
       )
     }
   }
@@ -159,7 +159,7 @@ class JsonSpec extends WordSpecLike with Matchers {
   "spray-json for Error" must {
     "support serializing DuplicateIndex" in {
       {
-        val error = api1.DuplicateIndex("key", "value")
+        val error = api1.DuplicateIndex("entityId", "key")
         val serialized = errorFormat.write(error)
         val deserialized = errorFormat.read(serialized)
         deserialized shouldBe error
@@ -175,7 +175,7 @@ class JsonSpec extends WordSpecLike with Matchers {
 
     "support serializing IndexIsFree" in {
       {
-        val error = api1.IndexIsFree("key", "value")
+        val error = api1.IndexIsFree("entityId", "key")
         val serialized = errorFormat.write(error)
         val deserialized = errorFormat.read(serialized)
         deserialized shouldBe error
@@ -191,7 +191,7 @@ class JsonSpec extends WordSpecLike with Matchers {
 
     "support serializing IndexIsAcquired" in {
       {
-        val error = api1.IndexIsAcquired("key", "value")
+        val error = api1.IndexIsAcquired("entityId", "key")
         val serialized = errorFormat.write(error)
         val deserialized = errorFormat.read(serialized)
         deserialized shouldBe error
@@ -207,7 +207,7 @@ class JsonSpec extends WordSpecLike with Matchers {
 
     "support serializing EntityIdMismatch" in {
       {
-        val error = api1.EntityIdMismatch("occupyingKey", "requestedKey", "value")
+        val error = api1.EntityIdMismatch("occupyingEntityId", "requestedEntityId", "key")
         val serialized = errorFormat.write(error)
         val deserialized = errorFormat.read(serialized)
         deserialized shouldBe error
@@ -308,7 +308,7 @@ class JsonSpec extends WordSpecLike with Matchers {
 
     "support serializing UnconfirmedServerState" in {
       {
-        val state = api1.UnconfirmedServerState("key")
+        val state = api1.UnconfirmedServerState("entityId")
         val serialized = serverStateFormat.write(state)
         val deserialized = serverStateFormat.read(serialized)
         deserialized shouldBe state
@@ -324,7 +324,7 @@ class JsonSpec extends WordSpecLike with Matchers {
 
     "support serializing AcquiredServerState" in {
       {
-        val state = api1.AcquiredServerState("key")
+        val state = api1.AcquiredServerState("entityId")
         val serialized = serverStateFormat.write(state)
         val deserialized = serverStateFormat.read(serialized)
         deserialized shouldBe state
@@ -342,7 +342,7 @@ class JsonSpec extends WordSpecLike with Matchers {
   "spray-json for UniqueIndexRequest" must {
     "support serializing GetEntityId" in {
       {
-        val request = api1.GetEntityId("value")
+        val request = api1.GetEntityId("key")
         val serialized = uniqueIndexRequestFormat.write(request)
         val deserialized = uniqueIndexRequestFormat.read(serialized)
         deserialized shouldBe request
@@ -358,7 +358,7 @@ class JsonSpec extends WordSpecLike with Matchers {
 
     "support serializing StartAcquisition" in {
       {
-        val request = api1.StartAcquisition("key", "value")
+        val request = api1.StartAcquisition("entityId", "key")
         val serialized = uniqueIndexRequestFormat.write(request)
         val deserialized = uniqueIndexRequestFormat.read(serialized)
         deserialized shouldBe request
@@ -374,7 +374,7 @@ class JsonSpec extends WordSpecLike with Matchers {
 
     "support serializing CommitAcquisition" in {
       {
-        val request = api1.CommitAcquisition("key", "value")
+        val request = api1.CommitAcquisition("entityId", "key")
         val serialized = uniqueIndexRequestFormat.write(request)
         val deserialized = uniqueIndexRequestFormat.read(serialized)
         deserialized shouldBe request
@@ -390,7 +390,7 @@ class JsonSpec extends WordSpecLike with Matchers {
 
     "support serializing RollbackAcquisition" in {
       {
-        val request = api1.RollbackAcquisition("key", "value")
+        val request = api1.RollbackAcquisition("entityId", "key")
         val serialized = uniqueIndexRequestFormat.write(request)
         val deserialized = uniqueIndexRequestFormat.read(serialized)
         deserialized shouldBe request
@@ -406,7 +406,7 @@ class JsonSpec extends WordSpecLike with Matchers {
 
     "support serializing StartRelease" in {
       {
-        val request = api1.StartRelease("key", "value")
+        val request = api1.StartRelease("entityId", "key")
         val serialized = uniqueIndexRequestFormat.write(request)
         val deserialized = uniqueIndexRequestFormat.read(serialized)
         deserialized shouldBe request
@@ -422,7 +422,7 @@ class JsonSpec extends WordSpecLike with Matchers {
 
     "support serializing CommitRelease" in {
       {
-        val request = api1.CommitRelease("key", "value")
+        val request = api1.CommitRelease("entityId", "key")
         val serialized = uniqueIndexRequestFormat.write(request)
         val deserialized = uniqueIndexRequestFormat.read(serialized)
         deserialized shouldBe request
@@ -438,7 +438,7 @@ class JsonSpec extends WordSpecLike with Matchers {
 
     "support serializing RollbackRelease" in {
       {
-        val request = api1.RollbackRelease("key", "value")
+        val request = api1.RollbackRelease("entityId", "key")
         val serialized = uniqueIndexRequestFormat.write(request)
         val deserialized = uniqueIndexRequestFormat.read(serialized)
         deserialized shouldBe request

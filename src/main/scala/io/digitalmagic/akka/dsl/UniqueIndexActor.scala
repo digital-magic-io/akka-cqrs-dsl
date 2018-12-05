@@ -38,124 +38,124 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
 
   val clientApi = new ApiHelper[ClientQuery, QueryAlgebra, Program] with ClientApi[QueryAlgebra, Program]
 
-  def askAndLog[U](key: indexApi.EntityIdType, value: ValueType)(f: IsIndexNeededResponse => Program[U]): Program[U] = for {
-    _        <- log(_.debug(s"[$value] is in unconfirmed state, asking [$key] if it is still needed"))
-    response <- clientApi.isIndexNeeded(key, value)
-    _        <- log(_.debug(s"got response from [$key] about [$value]: $response"))
+  def askAndLog[U](entityId: indexApi.EntityIdType, key: KeyType)(f: IsIndexNeededResponse => Program[U]): Program[U] = for {
+    _        <- log(_.debug(s"[$key] is in unconfirmed state, asking [$entityId] if it is still needed"))
+    response <- clientApi.isIndexNeeded(entityId, key)
+    _        <- log(_.debug(s"got response from [$entityId] about [$key]: $response"))
     result   <- f(response)
   } yield result
 
-  def getEntityId(value: ValueType): Program[Option[indexApi.EntityIdType]] = for {
-    _     <- log(_.debug(s"looking up entity id for [$value]"))
+  def getEntityId(key: KeyType): Program[Option[indexApi.EntityIdType]] = for {
+    _     <- log(_.debug(s"looking up entity id for [$key]"))
     state  <- get
     result <- state match {
       case FreeServerState() => pure(None)
-      case UnconfirmedServerState(key) =>
-        askAndLog[Option[indexApi.EntityIdType]](key, value) {
+      case UnconfirmedServerState(entityId) =>
+        askAndLog[Option[indexApi.EntityIdType]](entityId, key) {
           case IsIndexNeededResponse.No => for {
             _ <- emit(_ => ReleaseCompletedServerEvent())
           } yield None
           case IsIndexNeededResponse.Unknown => pure(None)
           case IsIndexNeededResponse.Yes => for {
             _ <- emit(_ => AcquisitionCompletedServerEvent())
-          } yield Some(key)
+          } yield Some(entityId)
         }
       case AcquiredServerState(occupyingEntityId) => pure(Some(occupyingEntityId))
     }
   } yield result
 
-  def startAcquisition(key: indexApi.EntityIdType, value: ValueType): Program[Unit] = for {
-    _     <- log(_.debug(s"starting [$value] acquisition for [$key]"))
+  def startAcquisition(entityId: indexApi.EntityIdType, key: KeyType): Program[Unit] = for {
+    _     <- log(_.debug(s"starting [$key] acquisition for [$entityId]"))
     state <- get
     _     <- state match {
-      case FreeServerState() => emit(_ => AcquisitionStartedServerEvent(key))
-      case UnconfirmedServerState(occupyingKey) if key == occupyingKey => pure(())
-      case UnconfirmedServerState(occupyingKey) if key != occupyingKey =>
-        askAndLog[Unit](occupyingKey, value) {
-          case IsIndexNeededResponse.No => emit(_ => AcquisitionStartedServerEvent(key))
-          case IsIndexNeededResponse.Unknown => raiseError[Unit](DuplicateIndex(occupyingKey, value))
-          case IsIndexNeededResponse.Yes => emit(_ => AcquisitionCompletedServerEvent()) >> raiseError(DuplicateIndex(occupyingKey, value))
+      case FreeServerState() => emit(_ => AcquisitionStartedServerEvent(entityId))
+      case UnconfirmedServerState(occupyingEntityId) if entityId == occupyingEntityId => pure(())
+      case UnconfirmedServerState(occupyingEntityId) if entityId != occupyingEntityId =>
+        askAndLog[Unit](occupyingEntityId, key) {
+          case IsIndexNeededResponse.No => emit(_ => AcquisitionStartedServerEvent(entityId))
+          case IsIndexNeededResponse.Unknown => raiseError[Unit](DuplicateIndex(occupyingEntityId, key))
+          case IsIndexNeededResponse.Yes => emit(_ => AcquisitionCompletedServerEvent()) >> raiseError(DuplicateIndex(occupyingEntityId, key))
         }
-      case AcquiredServerState(occupyingKey) => raiseError(DuplicateIndex(occupyingKey, value))
+      case AcquiredServerState(occupyingEntityId) => raiseError(DuplicateIndex(occupyingEntityId, key))
     }
   } yield ()
 
-  def commitAcquisition(key: indexApi.EntityIdType): Program[Unit] = for {
-    _     <- log(_.debug(s"committing [$entityId] acquisition for [$key]"))
+  def commitAcquisition(entityId: indexApi.EntityIdType): Program[Unit] = for {
+    _     <- log(_.debug(s"committing [${this.entityId}] acquisition for [$entityId]"))
     state <- get
     _     <- state match {
-      case FreeServerState() => raiseError(IndexIsFree(key, indexValue))
-      case UnconfirmedServerState(occupyingKey) if key == occupyingKey => emit(_ => AcquisitionCompletedServerEvent())
-      case UnconfirmedServerState(occupyingKey) if key != occupyingKey => raiseError(EntityIdMismatch(occupyingKey, key, indexValue))
-      case AcquiredServerState(occupyingKey) if key == occupyingKey => pure(())
-      case AcquiredServerState(occupyingKey) if key != occupyingKey => raiseError(EntityIdMismatch(occupyingKey, key, indexValue))
+      case FreeServerState() => raiseError(IndexIsFree(entityId, indexKey))
+      case UnconfirmedServerState(occupyingEntityId) if entityId == occupyingEntityId => emit(_ => AcquisitionCompletedServerEvent())
+      case UnconfirmedServerState(occupyingEntityId) if entityId != occupyingEntityId => raiseError(EntityIdMismatch(occupyingEntityId, entityId, indexKey))
+      case AcquiredServerState(occupyingEntityId) if entityId == occupyingEntityId => pure(())
+      case AcquiredServerState(occupyingEntityId) if entityId != occupyingEntityId => raiseError(EntityIdMismatch(occupyingEntityId, entityId, indexKey))
     }
   } yield ()
 
-  def rollbackAcquisition(key: indexApi.EntityIdType): Program[Unit] = for {
-    _     <- log(_.debug(s"rolling back [$entityId] acquisition for [$key]"))
-    state <- get
-    _     <- state match {
-      case FreeServerState() => pure(())
-      case UnconfirmedServerState(occupyingKey) if key == occupyingKey => emit(_ => ReleaseCompletedServerEvent())
-      case UnconfirmedServerState(occupyingKey) if key != occupyingKey => raiseError(EntityIdMismatch(occupyingKey, key, indexValue))
-      case AcquiredServerState(occupyingKey) if key == occupyingKey => raiseError(IndexIsAcquired(key, indexValue))
-      case AcquiredServerState(occupyingKey) if key != occupyingKey => raiseError(EntityIdMismatch(occupyingKey, key, indexValue))
-    }
-  } yield ()
-
-  def startRelease(key: indexApi.EntityIdType): Program[Unit] = for {
-    _     <- log(_.debug(s"starting [$entityId] release for [$key]"))
-    state <- get
-    _     <- state match {
-      case FreeServerState() => raiseError(IndexIsFree(key, indexValue))
-      case UnconfirmedServerState(occupyingKey) if key == occupyingKey => pure(())
-      case UnconfirmedServerState(occupyingKey) if key != occupyingKey => raiseError(EntityIdMismatch(occupyingKey, key, indexValue))
-      case AcquiredServerState(occupyingKey) if key == occupyingKey => emit(_ => ReleaseStartedServerEvent())
-      case AcquiredServerState(occupyingKey) if key != occupyingKey => raiseError(EntityIdMismatch(occupyingKey, key, indexValue))
-    }
-  } yield ()
-
-  def commitRelease(key: indexApi.EntityIdType): Program[Unit] = for {
-    _     <- log(_.debug(s"committing [$entityId] release for [$key]"))
+  def rollbackAcquisition(entityId: indexApi.EntityIdType): Program[Unit] = for {
+    _     <- log(_.debug(s"rolling back [${this.entityId}] acquisition for [$entityId]"))
     state <- get
     _     <- state match {
       case FreeServerState() => pure(())
-      case UnconfirmedServerState(occupyingKey) if key == occupyingKey => emit(_ => ReleaseCompletedServerEvent())
-      case UnconfirmedServerState(occupyingKey) if key != occupyingKey => raiseError(EntityIdMismatch(occupyingKey, key, indexValue))
-      case AcquiredServerState(_) => raiseError(IndexIsAcquired(key, indexValue))
+      case UnconfirmedServerState(occupyingEntityId) if entityId == occupyingEntityId => emit(_ => ReleaseCompletedServerEvent())
+      case UnconfirmedServerState(occupyingEntityId) if entityId != occupyingEntityId => raiseError(EntityIdMismatch(occupyingEntityId, entityId, indexKey))
+      case AcquiredServerState(occupyingEntityId) if entityId == occupyingEntityId => raiseError(IndexIsAcquired(entityId, indexKey))
+      case AcquiredServerState(occupyingEntityId) if entityId != occupyingEntityId => raiseError(EntityIdMismatch(occupyingEntityId, entityId, indexKey))
     }
   } yield ()
 
-  def rollbackRelease(key: indexApi.EntityIdType): Program[Unit] = for {
-    _     <- log(_.debug(s"rolling back [$entityId] release for [$key]"))
+  def startRelease(entityId: indexApi.EntityIdType): Program[Unit] = for {
+    _     <- log(_.debug(s"starting [${this.entityId}] release for [$entityId]"))
     state <- get
     _     <- state match {
-      case FreeServerState() => raiseError(IndexIsFree(key, indexValue))
-      case UnconfirmedServerState(occupyingKey) if key == occupyingKey => emit(_ => AcquisitionCompletedServerEvent())
-      case UnconfirmedServerState(occupyingKey) if key != occupyingKey => raiseError(EntityIdMismatch(occupyingKey, key, indexValue))
-      case AcquiredServerState(occupyingKey) if key == occupyingKey => pure(())
-      case AcquiredServerState(occupyingKey) if key != occupyingKey => raiseError(EntityIdMismatch(occupyingKey, key, indexValue))
+      case FreeServerState() => raiseError(IndexIsFree(entityId, indexKey))
+      case UnconfirmedServerState(occupyingEntityId) if entityId == occupyingEntityId => pure(())
+      case UnconfirmedServerState(occupyingEntityId) if entityId != occupyingEntityId => raiseError(EntityIdMismatch(occupyingEntityId, entityId, indexKey))
+      case AcquiredServerState(occupyingEntityId) if entityId == occupyingEntityId => emit(_ => ReleaseStartedServerEvent())
+      case AcquiredServerState(occupyingEntityId) if entityId != occupyingEntityId => raiseError(EntityIdMismatch(occupyingEntityId, entityId, indexKey))
+    }
+  } yield ()
+
+  def commitRelease(entityId: indexApi.EntityIdType): Program[Unit] = for {
+    _     <- log(_.debug(s"committing [${this.entityId}] release for [$entityId]"))
+    state <- get
+    _     <- state match {
+      case FreeServerState() => pure(())
+      case UnconfirmedServerState(occupyingEntityId) if entityId == occupyingEntityId => emit(_ => ReleaseCompletedServerEvent())
+      case UnconfirmedServerState(occupyingEntityId) if entityId != occupyingEntityId => raiseError(EntityIdMismatch(occupyingEntityId, entityId, indexKey))
+      case AcquiredServerState(_) => raiseError(IndexIsAcquired(entityId, indexKey))
+    }
+  } yield ()
+
+  def rollbackRelease(entityId: indexApi.EntityIdType): Program[Unit] = for {
+    _     <- log(_.debug(s"rolling back [${this.entityId}] release for [$entityId]"))
+    state <- get
+    _     <- state match {
+      case FreeServerState() => raiseError(IndexIsFree(entityId, indexKey))
+      case UnconfirmedServerState(occupyingEntityId) if entityId == occupyingEntityId => emit(_ => AcquisitionCompletedServerEvent())
+      case UnconfirmedServerState(occupyingEntityId) if entityId != occupyingEntityId => raiseError(EntityIdMismatch(occupyingEntityId, entityId, indexKey))
+      case AcquiredServerState(occupyingEntityId) if entityId == occupyingEntityId => pure(())
+      case AcquiredServerState(occupyingEntityId) if entityId != occupyingEntityId => raiseError(EntityIdMismatch(occupyingEntityId, entityId, indexKey))
     }
   } yield ()
 
   def requestToProgram: UniqueIndexRequest ~> Program  = Lambda[UniqueIndexRequest ~> Program] {
-    case GetEntityId(value) => getEntityId(value)
-    case StartAcquisition(key, value) => startAcquisition(key, value)
-    case CommitAcquisition(key, _) => commitAcquisition(key)
-    case RollbackAcquisition(key, _) => rollbackAcquisition(key)
-    case StartRelease(key, _) => startRelease(key)
-    case CommitRelease(key, _) => commitRelease(key)
-    case RollbackRelease(key, _) => rollbackRelease(key)
+    case GetEntityId(key) => getEntityId(key)
+    case StartAcquisition(entityId, key) => startAcquisition(entityId, key)
+    case CommitAcquisition(entityId, _) => commitAcquisition(entityId)
+    case RollbackAcquisition(entityId, _) => rollbackAcquisition(entityId)
+    case StartRelease(entityId, _) => startRelease(entityId)
+    case CommitRelease(entityId, _) => commitRelease(entityId)
+    case RollbackRelease(entityId, _) => rollbackRelease(entityId)
   }
 
   def entityId: String
-  def indexValue: ValueType = valueTypeToString.fromString(entityId).get
+  def indexKey: KeyType = keyToString.fromString(entityId).get
 }
 
 case class UniqueIndexActorDef[A <: UniqueIndexApi](indexApi: A, name: String, passivateIn: FiniteDuration = 5 seconds, numberOfShards: Int = 100)(implicit A: ActorBasedUniqueIndex[A]) {
   def extractEntityId: ExtractEntityId = {
-    case msg: indexApi.UniqueIndexRequest[_] => (indexApi.valueTypeToString.asString(msg.value), msg)
+    case msg: indexApi.UniqueIndexRequest[_] => (indexApi.keyToString.asString(msg.key), msg)
   }
 
   def extractShardId: ExtractShardId = {

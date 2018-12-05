@@ -21,16 +21,16 @@ object UniqueIndexApi {
   def getApiIdFor(api: UniqueIndexApi): String = currentMirror.reflect(api).symbol.fullName
   def getApiById(id: String): UniqueIndexApi = currentMirror.reflectModule(currentMirror.staticModule(id)).instance.asInstanceOf[UniqueIndexApi]
 
-  abstract class Base[E, V](dummy: Int, E: StringRepresentable[E], V: StringRepresentable[V]) extends UniqueIndexApi {
+  abstract class Base[E, K](dummy: Int, E: StringRepresentable[E], K: StringRepresentable[K]) extends UniqueIndexApi {
     Self: Singleton =>
     private[UniqueIndexApi] def this() = this(0, null, null) // we need this constructor for java serialization
-    def this()(implicit E: StringRepresentable[E], V: StringRepresentable[V]) = this(0, E, V)
+    def this()(implicit E: StringRepresentable[E], K: StringRepresentable[K]) = this(0, E, K)
     type ClientQueryType[T] = ClientQuery[T]
-    type ValueType = V
+    type KeyType = K
     type IndexApiType[T] = IndexApi[T]
     type EntityIdType = E
     type ClientEventType = ClientEvent
-    override def valueTypeToString: StringRepresentable[V] = V
+    override def keyToString: StringRepresentable[K] = K
     override def entityIdToString: StringRepresentable[E] = E
   }
 }
@@ -47,15 +47,15 @@ case class ClientIndexesStateMap private(map: Map[UniqueIndexApi, UniqueIndexApi
 
   def process[A <: UniqueIndexApi](api: A)(event: api.ClientEventType): ClientIndexesStateMap = modify(api) { state =>
     import api._
-      (state.get(event.value), event) match {
-        case (None,                                  AcquisitionStartedClientEvent(v))   => state + (v -> AcquisitionPendingClientState())
+      (state.get(event.key), event) match {
+        case (None,                                  AcquisitionStartedClientEvent(k))   => state + (k -> AcquisitionPendingClientState())
         case (Some(AcquisitionPendingClientState()), AcquisitionStartedClientEvent(_))   => state
-        case (Some(AcquisitionPendingClientState()), AcquisitionCompletedClientEvent(v)) => state + (v -> AcquiredClientState())
-        case (Some(AcquisitionPendingClientState()), AcquisitionAbortedClientEvent(v))   => state - v
-        case (Some(AcquiredClientState()),           ReleaseStartedClientEvent(v))       => state + (v -> ReleasePendingClientState())
+        case (Some(AcquisitionPendingClientState()), AcquisitionCompletedClientEvent(k)) => state + (k -> AcquiredClientState())
+        case (Some(AcquisitionPendingClientState()), AcquisitionAbortedClientEvent(k))   => state - k
+        case (Some(AcquiredClientState()),           ReleaseStartedClientEvent(k))       => state + (k -> ReleasePendingClientState())
         case (Some(ReleasePendingClientState()),     ReleaseStartedClientEvent(_))       => state
-        case (Some(ReleasePendingClientState()),     ReleaseCompletedClientEvent(v))     => state - v
-        case (Some(ReleasePendingClientState()),     ReleaseAbortedClientEvent(v))       => state + (v -> AcquiredClientState())
+        case (Some(ReleasePendingClientState()),     ReleaseCompletedClientEvent(k))     => state - k
+        case (Some(ReleasePendingClientState()),     ReleaseAbortedClientEvent(k))       => state + (k -> AcquiredClientState())
         case _                                                                           => sys.error("should not happen")
       }
     }
@@ -71,9 +71,9 @@ trait UniqueIndexApi {
   }
 
   type EntityIdType
-  type ValueType
+  type KeyType
   def entityIdToString: StringRepresentable[EntityIdType]
-  def valueTypeToString: StringRepresentable[ValueType]
+  def keyToString: StringRepresentable[KeyType]
 
   sealed trait ClientIndexState extends ApiAsset
   case class AcquisitionPendingClientState() extends ClientIndexState
@@ -83,75 +83,75 @@ trait UniqueIndexApi {
   type ClientEventType >: ClientEvent <: ClientEvent
   // cannot be trait otherwise due to scala bug pattern matching does not work
   sealed abstract class ClientEvent extends Event with ApiAsset {
-    def value: ValueType
+    def key: KeyType
     def reflect: Api.ClientEvent = this
   }
-  case class AcquisitionStartedClientEvent(value: ValueType) extends ClientEvent
-  case class AcquisitionCompletedClientEvent(value: ValueType) extends ClientEvent
-  case class AcquisitionAbortedClientEvent(value: ValueType) extends ClientEvent
-  case class ReleaseStartedClientEvent(value: ValueType) extends ClientEvent
-  case class ReleaseCompletedClientEvent(value: ValueType) extends ClientEvent
-  case class ReleaseAbortedClientEvent(value: ValueType) extends ClientEvent
+  case class AcquisitionStartedClientEvent(key: KeyType) extends ClientEvent
+  case class AcquisitionCompletedClientEvent(key: KeyType) extends ClientEvent
+  case class AcquisitionAbortedClientEvent(key: KeyType) extends ClientEvent
+  case class ReleaseStartedClientEvent(key: KeyType) extends ClientEvent
+  case class ReleaseCompletedClientEvent(key: KeyType) extends ClientEvent
+  case class ReleaseAbortedClientEvent(key: KeyType) extends ClientEvent
 
-  case class ClientIndexesState(map: Map[ValueType, ClientIndexState] = Map.empty) extends ApiAsset {
+  case class ClientIndexesState(map: Map[KeyType, ClientIndexState] = Map.empty) extends ApiAsset {
     def reflect: Api.ClientIndexesState = this
-    def get(v: ValueType): Option[ClientIndexState] = map.get(v)
-    def +(kv: (ValueType, ClientIndexState)): ClientIndexesState = ClientIndexesState(map + kv)
-    def -(k: ValueType): ClientIndexesState = ClientIndexesState(map - k)
-    def contains(k: ValueType): Boolean = map.contains(k)
+    def get(k: KeyType): Option[ClientIndexState] = map.get(k)
+    def +(kv: (KeyType, ClientIndexState)): ClientIndexesState = ClientIndexesState(map + kv)
+    def -(k: KeyType): ClientIndexesState = ClientIndexesState(map - k)
+    def contains(k: KeyType): Boolean = map.contains(k)
   }
 
   type IndexApiType[T] >: IndexApi[T] <: IndexApi[T]
   sealed trait IndexApi[T]
-  case class Acquire(value: ValueType) extends IndexApi[Unit]
-  case class Release(value: ValueType) extends IndexApi[Unit]
+  case class Acquire(key: KeyType) extends IndexApi[Unit]
+  case class Release(key: KeyType) extends IndexApi[Unit]
   def castIndexApi[T](v: IndexApiType[T]): IndexApi[T] = v
 
   sealed abstract class Error extends ResponseError with ApiAsset {
     def reflect: Api.Error = this
   }
-  case class DuplicateIndex(occupyingKey: EntityIdType, value: ValueType) extends Error
+  case class DuplicateIndex(occupyingEntityId: EntityIdType, key: KeyType) extends Error
   sealed trait BadRequest extends Error
-  case class IndexIsFree(key: EntityIdType, value: ValueType) extends BadRequest
-  case class IndexIsAcquired(key: EntityIdType, value: ValueType) extends BadRequest
-  case class EntityIdMismatch(occupyingKey: EntityIdType, requestedKey: EntityIdType, value: ValueType) extends BadRequest
+  case class IndexIsFree(entityId: EntityIdType, key: KeyType) extends BadRequest
+  case class IndexIsAcquired(entityId: EntityIdType, key: KeyType) extends BadRequest
+  case class EntityIdMismatch(occupyingEntityId: EntityIdType, requestedEntityId: EntityIdType, key: KeyType) extends BadRequest
 
   sealed abstract class UniqueIndexRequest[T] extends Request[T] with ApiAsset {
-    def value: ValueType
+    def key: KeyType
     def reflect: Api.UniqueIndexRequest[T] = this
   }
   sealed abstract class UniqueIndexQuery[T] extends UniqueIndexRequest[T] with Query[T]
-  case class GetEntityId(value: ValueType) extends UniqueIndexQuery[Option[EntityIdType]]
+  case class GetEntityId(key: KeyType) extends UniqueIndexQuery[Option[EntityIdType]]
   sealed abstract class UniqueIndexCommand[T] extends UniqueIndexRequest[T] with Command[T]
-  case class StartAcquisition(key: EntityIdType, value: ValueType) extends UniqueIndexCommand[Unit]
-  case class CommitAcquisition(key: EntityIdType, value: ValueType) extends UniqueIndexCommand[Unit]
-  case class RollbackAcquisition(key: EntityIdType, value: ValueType) extends UniqueIndexCommand[Unit]
-  case class StartRelease(key: EntityIdType, value: ValueType) extends UniqueIndexCommand[Unit]
-  case class CommitRelease(key: EntityIdType, value: ValueType) extends UniqueIndexCommand[Unit]
-  case class RollbackRelease(key: EntityIdType, value: ValueType) extends UniqueIndexCommand[Unit]
+  case class StartAcquisition(entityId: EntityIdType, key: KeyType) extends UniqueIndexCommand[Unit]
+  case class CommitAcquisition(entityId: EntityIdType, key: KeyType) extends UniqueIndexCommand[Unit]
+  case class RollbackAcquisition(entityId: EntityIdType, key: KeyType) extends UniqueIndexCommand[Unit]
+  case class StartRelease(entityId: EntityIdType, key: KeyType) extends UniqueIndexCommand[Unit]
+  case class CommitRelease(entityId: EntityIdType, key: KeyType) extends UniqueIndexCommand[Unit]
+  case class RollbackRelease(entityId: EntityIdType, key: KeyType) extends UniqueIndexCommand[Unit]
 
   trait QueryApi[Alg[A] <: CopK[_, A], Program[_]] {
     this: ApiHelper[UniqueIndexQuery, Alg, Program] =>
-    def getEntityId(value: ValueType): Program[Option[EntityIdType]] = GetEntityId(value)
+    def getEntityId(key: KeyType): Program[Option[EntityIdType]] = GetEntityId(key)
   }
 
   trait UpdateApi[Alg[A] <: CopK[_, A], Program[_]] {
     this: ApiHelper[IndexApiType, Alg, Program] =>
-    def acquire(value: ValueType): Program[Unit] = Acquire(value)
-    def release(value: ValueType): Program[Unit] = Release(value)
+    def acquire(key: KeyType): Program[Unit] = Acquire(key)
+    def release(key: KeyType): Program[Unit] = Release(key)
   }
 
   type ClientQueryType[T] >: ClientQuery[T] <: ClientQuery[T]
   // cannot be trait otherwise due to scala bug pattern matching does not work
   sealed abstract class ClientQuery[T] extends Query[T] with ApiAsset {
-    def key: EntityIdType
+    def entityId: EntityIdType
     def reflect: Api.ClientQuery[T] = this
   }
-  case class IsIndexNeeded(key: EntityIdType, value: ValueType) extends ClientQuery[IsIndexNeededResponse]
+  case class IsIndexNeeded(entityId: EntityIdType, key: KeyType) extends ClientQuery[IsIndexNeededResponse]
 
   trait ClientApi[Alg[A] <: CopK[_, A], Program[_]] {
     this: ApiHelper[ClientQuery, Alg, Program] =>
-    def isIndexNeeded(key: EntityIdType, value: ValueType): Program[IsIndexNeededResponse] = IsIndexNeeded(key, value)
+    def isIndexNeeded(entityId: EntityIdType, key: KeyType): Program[IsIndexNeededResponse] = IsIndexNeeded(entityId, key)
   }
 
   def clientQueryRuntimeInject[Alg[A] <: CopK[_, A]](implicit I: CopK.Inject[ClientQueryType, Alg]): UniqueIndexApi#ClientQueryType ~> Lambda[a => Option[Alg[a]]] =
@@ -168,7 +168,7 @@ trait UniqueIndexApi {
   sealed abstract class ServerEvent extends Event with ApiAsset {
     def reflect: Api.ServerEvent = this
   }
-  case class AcquisitionStartedServerEvent(key: EntityIdType) extends ServerEvent
+  case class AcquisitionStartedServerEvent(entityId: EntityIdType) extends ServerEvent
   case class AcquisitionCompletedServerEvent() extends ServerEvent
   case class ReleaseStartedServerEvent() extends ServerEvent
   case class ReleaseCompletedServerEvent() extends ServerEvent
@@ -178,17 +178,17 @@ trait UniqueIndexApi {
     def reflect: Api.UniqueIndexServerState = this
   }
   case class FreeServerState() extends UniqueIndexServerState
-  case class UnconfirmedServerState(key: EntityIdType) extends UniqueIndexServerState
-  case class AcquiredServerState(key: EntityIdType) extends UniqueIndexServerState
+  case class UnconfirmedServerState(entityId: EntityIdType) extends UniqueIndexServerState
+  case class AcquiredServerState(entityId: EntityIdType) extends UniqueIndexServerState
 
   val uniqueIndexState: PersistentStateProcessor[UniqueIndexServerState] = new PersistentStateProcessor[UniqueIndexServerState] {
     override def empty: UniqueIndexServerState = FreeServerState()
     override def process(state: UniqueIndexServerState, event: ServerEvent): UniqueIndexServerState = (state, event) match {
-      case (FreeServerState(),           AcquisitionStartedServerEvent(key)) => UnconfirmedServerState(key)
-      case (UnconfirmedServerState(_),   AcquisitionStartedServerEvent(key)) => AcquiredServerState(key)
-      case (UnconfirmedServerState(key), AcquisitionCompletedServerEvent())  => AcquiredServerState(key)
-      case (UnconfirmedServerState(_),   ReleaseCompletedServerEvent())      => FreeServerState()
-      case (AcquiredServerState(key),    ReleaseStartedServerEvent())        => UnconfirmedServerState(key)
+      case (FreeServerState(),                AcquisitionStartedServerEvent(entityId)) => UnconfirmedServerState(entityId)
+      case (UnconfirmedServerState(_),        AcquisitionStartedServerEvent(entityId)) => AcquiredServerState(entityId)
+      case (UnconfirmedServerState(entityId), AcquisitionCompletedServerEvent())       => AcquiredServerState(entityId)
+      case (UnconfirmedServerState(_),        ReleaseCompletedServerEvent())           => FreeServerState()
+      case (AcquiredServerState(entityId),    ReleaseStartedServerEvent())             => UnconfirmedServerState(entityId)
       case _ => sys.error("should not happen")
     }
   }

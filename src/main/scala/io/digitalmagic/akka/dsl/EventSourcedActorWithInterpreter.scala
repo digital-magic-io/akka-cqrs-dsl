@@ -166,8 +166,8 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   def rollback(normalMode: Boolean, onRollback: () => Unit): Unit = {
     val events = state.indexesState.map.keySet.toVector.flatMap { api =>
       state.indexesState.get(api).get.map.flatMap {
-        case (value, api.AcquisitionPendingClientState()) => Some(api.AcquisitionAbortedClientEvent(value))
-        case (value, api.ReleasePendingClientState()) => Some(api.ReleaseAbortedClientEvent(value))
+        case (key, api.AcquisitionPendingClientState()) => Some(api.AcquisitionAbortedClientEvent(key))
+        case (key, api.ReleasePendingClientState()) => Some(api.ReleaseAbortedClientEvent(key))
         case _ => None
       }
     }
@@ -189,8 +189,8 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
     val indexEvents = state.indexesState.map.keySet.toVector.flatMap { api =>
       val indexes = state.indexesState.get(api).get
       indexes.map.toVector.flatMap {
-        case (value, api.AcquisitionPendingClientState()) => Some(api.AcquisitionCompletedClientEvent(value))
-        case (value, api.ReleasePendingClientState()) => Some(api.ReleaseCompletedClientEvent(value))
+        case (key, api.AcquisitionPendingClientState()) => Some(api.AcquisitionCompletedClientEvent(key))
+        case (key, api.ReleasePendingClientState()) => Some(api.ReleaseCompletedClientEvent(key))
         case _ => None
       }
     }
@@ -213,18 +213,18 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
                                                          A: ActorBasedUniqueIndex[I]): T ~> IndexFuture = new (T ~> IndexFuture) {
 
     override def apply[A](fa: T[A]): IndexFuture[A] = api.castIndexApi(fa) match {
-      case api.Acquire(value) =>
-        if (state.indexesState.get(api).exists(_.contains(value))) {
+      case api.Acquire(key) =>
+        if (state.indexesState.get(api).exists(_.contains(key))) {
           Future.successful((f => f(), () => (), () => (), ()))
         } else {
           val p = Promise[IndexResult[Unit]]
-          persist(api.AcquisitionStartedClientEvent(value)) { event =>
+          persist(api.AcquisitionStartedClientEvent(key)) { event =>
             processIndexEvent(event)
-            A.indexActor command api.StartAcquisition(entityId, value) map identity onComplete {
+            A.indexActor command api.StartAcquisition(entityId, key) map identity onComplete {
               case TrySuccess(result) => p.success((
                 f => f(),
-                () => A.indexActor.tell(api.CommitAcquisition(entityId, value), ActorRef.noSender),
-                () => A.indexActor.tell(api.RollbackAcquisition(entityId, value), ActorRef.noSender),
+                () => A.indexActor.tell(api.CommitAcquisition(entityId, key), ActorRef.noSender),
+                () => A.indexActor.tell(api.RollbackAcquisition(entityId, key), ActorRef.noSender),
                 result
               ))
               case TryFailure(cause) => p.failure(cause)
@@ -232,18 +232,18 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
           }
           p.future
         }
-      case api.Release(value) =>
-        if (state.indexesState.get(api).exists(_.contains(value))) {
-          A.indexActor command api.StartRelease(entityId, value) map { result =>
+      case api.Release(key) =>
+        if (state.indexesState.get(api).exists(_.contains(key))) {
+          A.indexActor command api.StartRelease(entityId, key) map { result =>
             (
               f => {
-                persist(api.ReleaseStartedClientEvent(value)) { event =>
+                persist(api.ReleaseStartedClientEvent(key)) { event =>
                   processIndexEvent(event)
                   f()
                 }
               },
-              () => A.indexActor.tell(api.CommitRelease(entityId, value), ActorRef.noSender),
-              () => A.indexActor.tell(api.RollbackRelease(entityId, value), ActorRef.noSender),
+              () => A.indexActor.tell(api.CommitRelease(entityId, key), ActorRef.noSender),
+              () => A.indexActor.tell(api.RollbackRelease(entityId, key), ActorRef.noSender),
               result
             )
           }
@@ -340,11 +340,11 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   }
 
   implicit def clientQueryHandler[I <: UniqueIndexApi, T[_]](implicit api: UniqueIndexApi.ClientQueryAux[EntityIdType, I, T]): T ~> Const[Unit, ?] = Lambda[T ~> Const[Unit, ?]] {
-    case q@api.IsIndexNeeded(key, value) if key != entityId =>
-      logger.warning(s"entity id mismatch: got request [$q], while my entity id is [$entityId]")
-      sender() ! q.failure(api.EntityIdMismatch(entityId, key, value))
-    case q@api.IsIndexNeeded(_, value) =>
-      val response = state.indexesState.get(api).flatMap(_.get(value)) match {
+    case q@api.IsIndexNeeded(entityId, key) if entityId != EventSourcedActorWithInterpreter.this.entityId =>
+      logger.warning(s"entity id mismatch: got request [$q], while my entity id is [${EventSourcedActorWithInterpreter.this.entityId}]")
+      sender() ! q.failure(api.EntityIdMismatch(EventSourcedActorWithInterpreter.this.entityId, entityId, key))
+    case q@api.IsIndexNeeded(_, key) =>
+      val response = state.indexesState.get(api).flatMap(_.get(key)) match {
         case Some(api.AcquisitionPendingClientState()) => IsIndexNeededResponse.Unknown
         case Some(api.ReleasePendingClientState())     => IsIndexNeededResponse.Unknown
         case Some(api.AcquiredClientState())           => IsIndexNeededResponse.Yes
