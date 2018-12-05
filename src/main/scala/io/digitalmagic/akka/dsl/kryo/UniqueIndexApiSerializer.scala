@@ -16,7 +16,12 @@ class ApiSerializer extends Serializer[UniqueIndexApi] {
   }
 }
 
-class ClientEventSerializer extends Serializer[UniqueIndexApi#ClientEvent] {
+trait Helper {
+  def readEntityId(kryo: Kryo, input: Input, api: UniqueIndexApi): api.EntityIdType = kryo.readClassAndObject(input).asInstanceOf[api.EntityIdType]
+  def readValue(kryo: Kryo, input: Input, api: UniqueIndexApi): api.ValueType = kryo.readClassAndObject(input).asInstanceOf[api.ValueType]
+}
+
+class ClientEventSerializer extends Serializer[UniqueIndexApi#ClientEvent] with Helper {
   val AcquisitionStartedClientEventName = "AcquisitionStartedClientEvent"
   val AcquisitionCompletedClientEventName = "AcquisitionCompletedClientEvent"
   val AcquisitionAbortedClientEventName = "AcquisitionAbortedClientEvent"
@@ -57,22 +62,22 @@ class ClientEventSerializer extends Serializer[UniqueIndexApi#ClientEvent] {
 
     val event = input.readString() match {
       case AcquisitionStartedClientEventName =>
-        val value = kryo.readClassAndObject(input).asInstanceOf[ValueType]
+        val value = readValue(kryo, input, api)
         AcquisitionStartedClientEvent(value)
       case AcquisitionCompletedClientEventName =>
-        val value = kryo.readClassAndObject(input).asInstanceOf[ValueType]
+        val value = readValue(kryo, input, api)
         AcquisitionCompletedClientEvent(value)
       case AcquisitionAbortedClientEventName =>
-        val value = kryo.readClassAndObject(input).asInstanceOf[ValueType]
+        val value = readValue(kryo, input, api)
         AcquisitionAbortedClientEvent(value)
       case ReleaseStartedClientEventName =>
-        val value = kryo.readClassAndObject(input).asInstanceOf[ValueType]
+        val value = readValue(kryo, input, api)
         ReleaseStartedClientEvent(value)
       case ReleaseCompletedClientEventName =>
-        val value = kryo.readClassAndObject(input).asInstanceOf[ValueType]
+        val value = readValue(kryo, input, api)
         ReleaseCompletedClientEvent(value)
       case ReleaseAbortedClientEventName =>
-        val value = kryo.readClassAndObject(input).asInstanceOf[ValueType]
+        val value = readValue(kryo, input, api)
         ReleaseAbortedClientEvent(value)
       case other =>
         throw new KryoException(s"Unknown client event type: $other")
@@ -82,7 +87,7 @@ class ClientEventSerializer extends Serializer[UniqueIndexApi#ClientEvent] {
   }
 }
 
-class ClientIndexesStateMapSerializer extends Serializer[ClientIndexesStateMap] {
+class ClientIndexesStateMapSerializer extends Serializer[ClientIndexesStateMap] with Helper {
   val AcquisitionPendingClientStateName = "AcquisitionPendingClientState"
   val ReleasePendingClientStateName = "ReleasePendingClientState"
   val AcquiredClientStateName = "AcquiredClientState"
@@ -104,7 +109,7 @@ class ClientIndexesStateMapSerializer extends Serializer[ClientIndexesStateMap] 
     import api._
     val length = input.readInt(true)
     ClientIndexesState((1 to length).map { _ =>
-      val k = kryo.readClassAndObject(input).asInstanceOf[ValueType]
+      val k = readValue(kryo, input, api)
       val v = input.readString() match {
         case AcquisitionPendingClientStateName => AcquisitionPendingClientState()
         case ReleasePendingClientStateName => ReleasePendingClientState()
@@ -133,7 +138,7 @@ class ClientIndexesStateMapSerializer extends Serializer[ClientIndexesStateMap] 
   }
 }
 
-class ErrorSerializer extends Serializer[UniqueIndexApi#Error] {
+class ErrorSerializer extends Serializer[UniqueIndexApi#Error] with Helper {
   val DuplicateIndexName = "DuplicateIndex"
   val IndexIsFreeName = "IndexIsFree"
   val IndexIsAcquiredName = "IndexIsAcquired"
@@ -168,28 +173,28 @@ class ErrorSerializer extends Serializer[UniqueIndexApi#Error] {
     import api._
     input.readString() match {
       case DuplicateIndexName =>
-        val key = kryo.readClassAndObject(input).asInstanceOf[EntityIdType]
-        val value = kryo.readClassAndObject(input).asInstanceOf[ValueType]
+        val key = readEntityId(kryo, input, api)
+        val value = readValue(kryo, input, api)
         DuplicateIndex(key, value)
       case IndexIsFreeName =>
-        val key = kryo.readClassAndObject(input).asInstanceOf[EntityIdType]
-        val value = kryo.readClassAndObject(input).asInstanceOf[ValueType]
+        val key = readEntityId(kryo, input, api)
+        val value = readValue(kryo, input, api)
         IndexIsFree(key, value)
       case IndexIsAcquiredName =>
-        val key = kryo.readClassAndObject(input).asInstanceOf[EntityIdType]
-        val value = kryo.readClassAndObject(input).asInstanceOf[ValueType]
+        val key = readEntityId(kryo, input, api)
+        val value = readValue(kryo, input, api)
         IndexIsAcquired(key, value)
       case EntityIdMismatchName =>
-        val occupyingKey = kryo.readClassAndObject(input).asInstanceOf[EntityIdType]
-        val requestedKey = kryo.readClassAndObject(input).asInstanceOf[EntityIdType]
-        val value = kryo.readClassAndObject(input).asInstanceOf[ValueType]
+        val occupyingKey = readEntityId(kryo, input, api)
+        val requestedKey = readEntityId(kryo, input, api)
+        val value = readValue(kryo, input, api)
         EntityIdMismatch(occupyingKey, requestedKey, value)
       case other => throw new KryoException(s"Unknown error type: $other")
     }
   }
 }
 
-class ServerEventSerializer extends Serializer[UniqueIndexApi#ServerEvent] {
+class ServerEventSerializer extends Serializer[UniqueIndexApi#ServerEvent] with Helper {
   val AcquisitionStartedServerEventName   = "AcquisitionStartedServerEvent"
   val AcquisitionCompletedServerEventName = "AcquisitionCompletedServerEvent"
   val ReleaseStartedServerEventName       = "ReleaseStartedServerEvent"
@@ -216,7 +221,7 @@ class ServerEventSerializer extends Serializer[UniqueIndexApi#ServerEvent] {
     import api._
     input.readString() match {
       case AcquisitionStartedServerEventName =>
-        val key = kryo.readClassAndObject(input).asInstanceOf[EntityIdType]
+        val key = readEntityId(kryo, input, api)
         AcquisitionStartedServerEvent(key)
       case AcquisitionCompletedServerEventName =>
         AcquisitionCompletedServerEvent()
@@ -229,7 +234,7 @@ class ServerEventSerializer extends Serializer[UniqueIndexApi#ServerEvent] {
   }
 }
 
-class ServerStateSerializer extends Serializer[UniqueIndexApi#UniqueIndexServerState] {
+class ServerStateSerializer extends Serializer[UniqueIndexApi#UniqueIndexServerState] with Helper {
   val FreeServerStateName = "FreeServerState"
   val UnconfirmedServerStateName = "UnconfirmedServerState"
   val AcquiredServerStateName = "AcquiredServerState"
@@ -256,17 +261,17 @@ class ServerStateSerializer extends Serializer[UniqueIndexApi#UniqueIndexServerS
       case FreeServerStateName =>
         FreeServerState()
       case UnconfirmedServerStateName =>
-        val key = kryo.readClassAndObject(input).asInstanceOf[EntityIdType]
+        val key = readEntityId(kryo, input, api)
         UnconfirmedServerState(key)
       case AcquiredServerStateName =>
-        val key = kryo.readClassAndObject(input).asInstanceOf[EntityIdType]
+        val key = readEntityId(kryo, input, api)
         AcquiredServerState(key)
       case other => throw new KryoException(s"Unknown server state type: $other")
     }
   }
 }
 
-class UniqueIndexRequestSerializer extends Serializer[UniqueIndexApi#UniqueIndexRequest[_]] {
+class UniqueIndexRequestSerializer extends Serializer[UniqueIndexApi#UniqueIndexRequest[_]] with Helper {
   val GetEntityIdName         = "GetEntityId"
   val StartAcquisitionName    = "StartAcquisition"
   val CommitAcquisitionName   = "CommitAcquisition"
@@ -314,31 +319,31 @@ class UniqueIndexRequestSerializer extends Serializer[UniqueIndexApi#UniqueIndex
     import api._
     input.readString() match {
       case GetEntityIdName =>
-        val value = kryo.readClassAndObject(input).asInstanceOf[ValueType]
+        val value = readValue(kryo, input, api)
         GetEntityId(value)
       case StartAcquisitionName =>
-        val key = kryo.readClassAndObject(input).asInstanceOf[EntityIdType]
-        val value = kryo.readClassAndObject(input).asInstanceOf[ValueType]
+        val key = readEntityId(kryo, input, api)
+        val value = readValue(kryo, input, api)
         StartAcquisition(key, value)
       case CommitAcquisitionName =>
-        val key = kryo.readClassAndObject(input).asInstanceOf[EntityIdType]
-        val value = kryo.readClassAndObject(input).asInstanceOf[ValueType]
+        val key = readEntityId(kryo, input, api)
+        val value = readValue(kryo, input, api)
         CommitAcquisition(key, value)
       case RollbackAcquisitionName =>
-        val key = kryo.readClassAndObject(input).asInstanceOf[EntityIdType]
-        val value = kryo.readClassAndObject(input).asInstanceOf[ValueType]
+        val key = readEntityId(kryo, input, api)
+        val value = readValue(kryo, input, api)
         RollbackAcquisition(key, value)
       case StartReleaseName =>
-        val key = kryo.readClassAndObject(input).asInstanceOf[EntityIdType]
-        val value = kryo.readClassAndObject(input).asInstanceOf[ValueType]
+        val key = readEntityId(kryo, input, api)
+        val value = readValue(kryo, input, api)
         StartRelease(key, value)
       case CommitReleaseName =>
-        val key = kryo.readClassAndObject(input).asInstanceOf[EntityIdType]
-        val value = kryo.readClassAndObject(input).asInstanceOf[ValueType]
+        val key = readEntityId(kryo, input, api)
+        val value = readValue(kryo, input, api)
         CommitRelease(key, value)
       case RollbackReleaseName =>
-        val key = kryo.readClassAndObject(input).asInstanceOf[EntityIdType]
-        val value = kryo.readClassAndObject(input).asInstanceOf[ValueType]
+        val key = readEntityId(kryo, input, api)
+        val value = readValue(kryo, input, api)
         RollbackRelease(key, value)
       case other => throw new KryoException(s"Unknown request type: $other")
     }

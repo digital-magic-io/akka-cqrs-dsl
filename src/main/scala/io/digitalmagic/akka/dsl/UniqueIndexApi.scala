@@ -154,13 +154,13 @@ trait UniqueIndexApi {
     def isIndexNeeded(key: EntityIdType, value: ValueType): Program[IsIndexNeededResponse] = IsIndexNeeded(key, value)
   }
 
-  def clientQueryRuntimeInject[Alg[A] <: CopK[_, A]](implicit I: CopK.Inject[ClientQuery, Alg]): UniqueIndexApi#ClientQuery ~> Lambda[a => Option[Alg[a]]] =
+  def clientQueryRuntimeInject[Alg[A] <: CopK[_, A]](implicit I: CopK.Inject[ClientQueryType, Alg]): UniqueIndexApi#ClientQueryType ~> Lambda[a => Option[Alg[a]]] =
     Lambda[UniqueIndexApi#ClientQuery ~> Lambda[a => Option[Alg[a]]]] {
       case c: ClientQuery[_] => Some(I(c))
       case _ => None
     }
 
-  def clientEventRuntimeInject[Alg <: Cop[_]](event: UniqueIndexApi#ClientEvent)(implicit I: Cop.Inject[ClientEvent, Alg]): Option[Alg] = event match {
+  def clientEventRuntimeInject[Alg <: Cop[_]](event: UniqueIndexApi#ClientEventType)(implicit I: Cop.Inject[ClientEventType, Alg]): Option[Alg] = event match {
     case e: ClientEvent => Some(I(e))
     case _ => None
   }
