@@ -63,9 +63,8 @@ trait EventSourcedPrograms extends EventSourced {
 
   def log(f: LoggingAdapter => Unit): Program[Unit] = logWriterMonad.tell(Vector(f))
 
-  def emit(e: Environment => EventType): Program[Unit] = for {
-    ev <- asks(e)
-    _  <- modify(_.process(ev))
-    _  <- tell(Vector(ev))
+  def emit(events: EventType*): Program[Unit] = for {
+    _ <- modify(events.foldLeft(_)(_.process(_)))
+    _ <- tell(events.toVector)
   } yield ()
 }

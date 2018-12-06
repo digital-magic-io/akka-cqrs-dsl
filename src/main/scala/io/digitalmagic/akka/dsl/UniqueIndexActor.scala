@@ -53,11 +53,11 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
       case UnconfirmedServerState(entityId) =>
         askAndLog[Option[indexApi.EntityIdType]](entityId, key) {
           case IsIndexNeededResponse.No => for {
-            _ <- emit(_ => ReleaseCompletedServerEvent())
+            _ <- emit(ReleaseCompletedServerEvent())
           } yield None
           case IsIndexNeededResponse.Unknown => pure(None)
           case IsIndexNeededResponse.Yes => for {
-            _ <- emit(_ => AcquisitionCompletedServerEvent())
+            _ <- emit(AcquisitionCompletedServerEvent())
           } yield Some(entityId)
         }
       case AcquiredServerState(occupyingEntityId) => pure(Some(occupyingEntityId))
@@ -68,13 +68,13 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
     _     <- log(_.debug(s"starting [$key] acquisition for [$entityId]"))
     state <- get
     _     <- state match {
-      case FreeServerState() => emit(_ => AcquisitionStartedServerEvent(entityId))
+      case FreeServerState() => emit(AcquisitionStartedServerEvent(entityId))
       case UnconfirmedServerState(occupyingEntityId) if entityId == occupyingEntityId => pure(())
       case UnconfirmedServerState(occupyingEntityId) if entityId != occupyingEntityId =>
         askAndLog[Unit](occupyingEntityId, key) {
-          case IsIndexNeededResponse.No => emit(_ => AcquisitionStartedServerEvent(entityId))
+          case IsIndexNeededResponse.No => emit(AcquisitionStartedServerEvent(entityId))
           case IsIndexNeededResponse.Unknown => raiseError[Unit](DuplicateIndex(occupyingEntityId, key))
-          case IsIndexNeededResponse.Yes => emit(_ => AcquisitionCompletedServerEvent()) >> raiseError(DuplicateIndex(occupyingEntityId, key))
+          case IsIndexNeededResponse.Yes => emit(AcquisitionCompletedServerEvent()) >> raiseError(DuplicateIndex(occupyingEntityId, key))
         }
       case AcquiredServerState(occupyingEntityId) => raiseError(DuplicateIndex(occupyingEntityId, key))
     }
@@ -85,7 +85,7 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
     state <- get
     _     <- state match {
       case FreeServerState() => raiseError(IndexIsFree(entityId, indexKey))
-      case UnconfirmedServerState(occupyingEntityId) if entityId == occupyingEntityId => emit(_ => AcquisitionCompletedServerEvent())
+      case UnconfirmedServerState(occupyingEntityId) if entityId == occupyingEntityId => emit(AcquisitionCompletedServerEvent())
       case UnconfirmedServerState(occupyingEntityId) if entityId != occupyingEntityId => raiseError(EntityIdMismatch(occupyingEntityId, entityId, indexKey))
       case AcquiredServerState(occupyingEntityId) if entityId == occupyingEntityId => pure(())
       case AcquiredServerState(occupyingEntityId) if entityId != occupyingEntityId => raiseError(EntityIdMismatch(occupyingEntityId, entityId, indexKey))
@@ -97,7 +97,7 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
     state <- get
     _     <- state match {
       case FreeServerState() => pure(())
-      case UnconfirmedServerState(occupyingEntityId) if entityId == occupyingEntityId => emit(_ => ReleaseCompletedServerEvent())
+      case UnconfirmedServerState(occupyingEntityId) if entityId == occupyingEntityId => emit(ReleaseCompletedServerEvent())
       case UnconfirmedServerState(occupyingEntityId) if entityId != occupyingEntityId => raiseError(EntityIdMismatch(occupyingEntityId, entityId, indexKey))
       case AcquiredServerState(occupyingEntityId) if entityId == occupyingEntityId => raiseError(IndexIsAcquired(entityId, indexKey))
       case AcquiredServerState(occupyingEntityId) if entityId != occupyingEntityId => raiseError(EntityIdMismatch(occupyingEntityId, entityId, indexKey))
@@ -111,7 +111,7 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
       case FreeServerState() => raiseError(IndexIsFree(entityId, indexKey))
       case UnconfirmedServerState(occupyingEntityId) if entityId == occupyingEntityId => pure(())
       case UnconfirmedServerState(occupyingEntityId) if entityId != occupyingEntityId => raiseError(EntityIdMismatch(occupyingEntityId, entityId, indexKey))
-      case AcquiredServerState(occupyingEntityId) if entityId == occupyingEntityId => emit(_ => ReleaseStartedServerEvent())
+      case AcquiredServerState(occupyingEntityId) if entityId == occupyingEntityId => emit(ReleaseStartedServerEvent())
       case AcquiredServerState(occupyingEntityId) if entityId != occupyingEntityId => raiseError(EntityIdMismatch(occupyingEntityId, entityId, indexKey))
     }
   } yield ()
@@ -121,7 +121,7 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
     state <- get
     _     <- state match {
       case FreeServerState() => pure(())
-      case UnconfirmedServerState(occupyingEntityId) if entityId == occupyingEntityId => emit(_ => ReleaseCompletedServerEvent())
+      case UnconfirmedServerState(occupyingEntityId) if entityId == occupyingEntityId => emit(ReleaseCompletedServerEvent())
       case UnconfirmedServerState(occupyingEntityId) if entityId != occupyingEntityId => raiseError(EntityIdMismatch(occupyingEntityId, entityId, indexKey))
       case AcquiredServerState(_) => raiseError(IndexIsAcquired(entityId, indexKey))
     }
@@ -132,7 +132,7 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
     state <- get
     _     <- state match {
       case FreeServerState() => raiseError(IndexIsFree(entityId, indexKey))
-      case UnconfirmedServerState(occupyingEntityId) if entityId == occupyingEntityId => emit(_ => AcquisitionCompletedServerEvent())
+      case UnconfirmedServerState(occupyingEntityId) if entityId == occupyingEntityId => emit(AcquisitionCompletedServerEvent())
       case UnconfirmedServerState(occupyingEntityId) if entityId != occupyingEntityId => raiseError(EntityIdMismatch(occupyingEntityId, entityId, indexKey))
       case AcquiredServerState(occupyingEntityId) if entityId == occupyingEntityId => pure(())
       case AcquiredServerState(occupyingEntityId) if entityId != occupyingEntityId => raiseError(EntityIdMismatch(occupyingEntityId, entityId, indexKey))

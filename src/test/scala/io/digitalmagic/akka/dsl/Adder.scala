@@ -57,7 +57,7 @@ trait AdderPrograms extends EventSourcedPrograms {
   def queryAndAdd: Program[Int] = for {
     v1 <- a1.getValue
     v2 <- a2.getValue
-    _  <- emit(_ => MyEvent)
+    _  <- emit(MyEvent)
   } yield v1 + v2
 }
 

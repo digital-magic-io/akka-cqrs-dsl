@@ -63,7 +63,7 @@ trait Actor1Programs extends EventSourcedPrograms {
   def getValue: Program[Int] = gets(_.value)
   def setValue(value: Int): Program[Unit] = for {
     _ <- log(_.info("setting value"))
-    _ <- emit(_ => ValueSet(value))
+    _ <- emit(ValueSet(value))
   } yield ()
 }
 
