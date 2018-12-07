@@ -32,6 +32,6 @@ trait EventSourced {
   implicit val persistentState: PersistentStateProcessor[State]
 }
 
-class ApiHelper[F[A], Alg[A] <: CopK[_, A], Program[_]](implicit val I: CopK.Inject[F, Alg], val T: Alg ~> Program) {
+class ApiHelper[F[_], Alg[A] <: CopK[_, A], Program[_]](implicit val I: CopK.Inject[F, Alg], val T: Alg ~> Program) {
   implicit def lift[A](fa: F[A]): Program[A] = T(I(fa))
 }

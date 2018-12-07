@@ -14,7 +14,6 @@ object ClientEventInterpreterS {
 }
 
 sealed trait IndexList {
-  type This >: this.type <: IndexList
   type List <: TList
   type AlgebraList <: TListK
   type Algebra[A] <: CopK[AlgebraList, A]
@@ -46,43 +45,38 @@ final class WithIndex[L <: TList, AL <: TListK, CAL <: TListK, CEL <: TList] ext
   type ClientEventAlgebra = Cop[ClientEventList]
 }
 
-trait ClientQueryRuntimeInject[L <: TList, Alg[X] <: CopK[_, X]] {
-  def runtimeInject: UniqueIndexApi#ClientQuery ~> Lambda[a => Option[Alg[a]]]
+trait ClientRuntime[L <: TList, IL <: IndexList] {
+  def injectQuery: UniqueIndexApi#ClientQuery ~> Lambda[a => Option[IL#ClientAlgebra[a]]]
+  def injectEvent(e: UniqueIndexApi#ClientEvent): Option[IL#ClientEventAlgebra]
 }
 
-object ClientQueryRuntimeInject {
-  implicit def base[E, Alg[X] <: CopK[_, X]]: ClientQueryRuntimeInject[TNil, Alg] = new ClientQueryRuntimeInject[TNil, Alg] {
-    override def runtimeInject: UniqueIndexApi#ClientQuery ~> Lambda[a => Option[Alg[a]]] = Lambda[UniqueIndexApi#ClientQuery ~> Lambda[a => Option[Alg[a]]]] {
+object ClientRuntime {
+  implicit def base[E, IL <: IndexList]: ClientRuntime[TNil, IL] = new ClientRuntime[TNil, IL] {
+    override def injectQuery: UniqueIndexApi#ClientQuery ~> Lambda[a => Option[IL#ClientAlgebra[a]]] = Lambda[UniqueIndexApi#ClientQuery ~> Lambda[a => Option[IL#ClientAlgebra[a]]]] {
       _ => None
     }
+    override def injectEvent(e: UniqueIndexApi#ClientEvent): Option[IL#ClientEventAlgebra] = None
   }
 
-  implicit def induct[E, I <: UniqueIndexApi, L <: TList, Alg[X] <: CopK[_, X], T[X] >: I#ClientQuery[X] <: I#ClientQuery[X]](implicit
-                                                                                                                              api: UniqueIndexApi.ClientQueryAux[E, I, T],
-                                                                                                                              L: ClientQueryRuntimeInject[L, Alg],
-                                                                                                                              I: CopK.Inject[T, Alg]): ClientQueryRuntimeInject[I ::: L, Alg] =
-    new ClientQueryRuntimeInject[I ::: L, Alg] {
-      override def runtimeInject: UniqueIndexApi#ClientQuery ~> Lambda[a => Option[Alg[a]]] = Lambda[UniqueIndexApi#ClientQuery ~> Lambda[a => Option[Alg[a]]]] {
-        c => api.clientQueryRuntimeInject(I)(c).orElse(L.runtimeInject(c))
+  implicit def induct[E,
+                      I <: UniqueIndexApi,
+                      L <: TList,
+                      IL <: IndexList,
+                      T[X] >: I#ClientQuery[X] <: I#ClientQuery[X],
+                      U
+                     ](implicit
+                       L: ClientRuntime[L, IL],
+                       QA: UniqueIndexApi.ClientQueryAux[E, I, T],
+                       QI: CopK.Inject[T, IL#ClientAlgebra],
+                       EA: UniqueIndexApi.ClientEventAux[E, I, U],
+                       EI: Cop.Inject[U, IL#ClientEventAlgebra]
+                     ): ClientRuntime[I ::: L, IL] =
+
+    new ClientRuntime[I ::: L, IL] {
+      override def injectQuery: UniqueIndexApi#ClientQuery ~> Lambda[a => Option[IL#ClientAlgebra[a]]] = Lambda[UniqueIndexApi#ClientQuery ~> Lambda[a => Option[IL#ClientAlgebra[a]]]] {
+        c => QA.clientQueryRuntimeInject(QI)(c).orElse(L.injectQuery(c))
       }
-    }
-}
-
-trait ClientEventRuntimeInject[L <: TList, Alg <: Cop[_]] {
-  def apply(e: UniqueIndexApi#ClientEvent): Option[Alg]
-}
-
-object ClientEventRuntimeInject {
-  implicit def base[Alg <: Cop[_]]: ClientEventRuntimeInject[TNil, Alg] = new ClientEventRuntimeInject[TNil, Alg] {
-    override def apply(e: UniqueIndexApi#ClientEvent): Option[Alg] = None
-  }
-
-  implicit def induct[E, I <: UniqueIndexApi, L <: TList, Alg <: Cop[_], T](implicit
-                                                                            api: UniqueIndexApi.ClientEventAux[E, I, T],
-                                                                            L: ClientEventRuntimeInject[L, Alg],
-                                                                            I: Cop.Inject[T, Alg]): ClientEventRuntimeInject[I ::: L, Alg] =
-    new ClientEventRuntimeInject[I ::: L, Alg] {
-      override def apply(e: UniqueIndexApi#ClientEvent): Option[Alg] =
-        api.clientEventRuntimeInject(e).orElse(L(e))
+      override def injectEvent(e: UniqueIndexApi#ClientEvent): Option[IL#ClientEventAlgebra] =
+        EA.clientEventRuntimeInject(e).orElse(L.injectEvent(e))
     }
 }

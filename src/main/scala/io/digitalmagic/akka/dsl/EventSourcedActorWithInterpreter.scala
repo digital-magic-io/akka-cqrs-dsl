@@ -120,7 +120,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   }
 
   private def processIndexEvent(event: UniqueIndexApi#ClientEvent): Unit = {
-    clientEventRuntimeInject(event) match {
+    clientRuntime.injectEvent(event) match {
       case Some(e) => state = state.copy(indexesState = clientEventInterpreter(e)(state.indexesState))
       case None => logger.warning(s"unknown client index event: $event")
 
@@ -364,7 +364,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
 
   private def processIsIndexNeeded: Receive = {
     case q: UniqueIndexApi#ClientQuery[_] =>
-      clientQueryRuntimeInject.runtimeInject(q) match {
+      clientRuntime.injectQuery(q) match {
         case Some(query) =>
           clientApiInterpreter(query)
         case None =>

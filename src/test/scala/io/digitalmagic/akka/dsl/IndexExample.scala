@@ -38,8 +38,7 @@ trait IndexExample extends EventSourcedPrograms {
   override val algebraIsQuery: IsQuery[QueryAlgebra] = implicitly
 
   type Index = EmptyIndexList# + [index1Api.type]# + [index2Api.type]
-  override val clientQueryRuntimeInject: ClientQueryRuntimeInject[Index#List, Index#ClientAlgebra] = implicitly
-  override val clientEventRuntimeInject: ClientEventRuntimeInject[Index#List, Index#ClientEventAlgebra] = implicitly
+  override val clientRuntime: ClientRuntime[Index#List, Index] = implicitly
 
   override type EventType = MyEvent
   override lazy val eventTypeTag: ClassTag[EventType] = implicitly

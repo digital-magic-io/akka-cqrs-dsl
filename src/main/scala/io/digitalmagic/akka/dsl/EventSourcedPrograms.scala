@@ -19,8 +19,7 @@ trait EventSourcedPrograms extends EventSourced {
   protected val algebraIsQuery: IsQuery[QueryAlgebra]
 
   protected type Index <: IndexList
-  protected val clientQueryRuntimeInject: ClientQueryRuntimeInject[Index#List, Index#ClientAlgebra]
-  protected val clientEventRuntimeInject: ClientEventRuntimeInject[Index#List, Index#ClientEventAlgebra]
+  protected val clientRuntime: ClientRuntime[Index#List, Index]
 
   type Program[_]
   implicit val programMonad: Monad[Program]

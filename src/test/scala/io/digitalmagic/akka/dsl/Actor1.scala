@@ -57,8 +57,7 @@ trait Actor1Programs extends EventSourcedPrograms {
   override val algebraIsQuery: IsQuery[QueryAlgebra] = implicitly
 
   override type Index = EmptyIndexList
-  override val clientQueryRuntimeInject: ClientQueryRuntimeInject[Index#List, Index#ClientAlgebra] = implicitly
-  override val clientEventRuntimeInject: ClientEventRuntimeInject[Index#List, Index#ClientEventAlgebra] = implicitly
+  override val clientRuntime: ClientRuntime[Index#List, Index] = implicitly
 
   def getValue: Program[Int] = gets(_.value)
   def setValue(value: Int): Program[Unit] = for {

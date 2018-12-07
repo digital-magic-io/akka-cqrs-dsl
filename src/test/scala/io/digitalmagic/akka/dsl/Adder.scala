@@ -48,8 +48,7 @@ trait AdderPrograms extends EventSourcedPrograms {
   override val algebraIsQuery: IsQuery[QueryAlgebra] = implicitly
 
   override type Index = EmptyIndexList
-  override val clientQueryRuntimeInject: ClientQueryRuntimeInject[Index#List, Index#ClientAlgebra] = implicitly
-  override val clientEventRuntimeInject: ClientEventRuntimeInject[Index#List, Index#ClientEventAlgebra] = implicitly
+  override val clientRuntime: ClientRuntime[Index#List, Index] = implicitly
 
   val a1 = new ApiHelper[Actor1.Query, QueryAlgebra, Program] with Actor1.Api[QueryAlgebra, Program]
   val a2 = new ApiHelper[Actor2.Query, QueryAlgebra, Program] with Actor2.Api[QueryAlgebra, Program]
