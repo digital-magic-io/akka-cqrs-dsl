@@ -83,15 +83,15 @@ object IndexExampleActor {
     msg => (math.abs(extractEntityId(msg)._1.hashCode) % 100).toString
   }
 
-  def props(entityId: String)(implicit I1: ActorBasedUniqueIndex[IndexExample.index1Api.type], I2: ActorBasedUniqueIndex[IndexExample.index2Api.type]) = Props(IndexExampleActor(entityId))
+  def props(entityId: String)(implicit I1: UniqueIndexInterface[IndexExample.index1Api.type], I2: UniqueIndexInterface[IndexExample.index2Api.type]) = Props(IndexExampleActor(entityId))
 }
 
-case class IndexExampleActor(entityId: String)(implicit I1: ActorBasedUniqueIndex[IndexExample.index1Api.type], I2: ActorBasedUniqueIndex[IndexExample.index2Api.type]) extends IndexExample with EventSourcedActorWithInterpreter {
+case class IndexExampleActor(entityId: String)(implicit I1: UniqueIndexInterface[IndexExample.index1Api.type], I2: UniqueIndexInterface[IndexExample.index2Api.type]) extends IndexExample with EventSourcedActorWithInterpreter {
   import IndexExample._
 
   context.setReceiveTimeout(1 seconds)
 
-  override def interpreter: QueryAlgebra ~> QueryFuture = CopK.NaturalTransformation.summon[QueryAlgebra, QueryFuture]
+  override def interpreter: QueryAlgebra ~> RequestFuture = CopK.NaturalTransformation.summon[QueryAlgebra, RequestFuture]
   override def indexInterpreter: Index#Algebra ~> IndexFuture = CopK.NaturalTransformation.summon[Index#Algebra, IndexFuture]
   override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, ?] = CopK.NaturalTransformation.summon[Index#ClientAlgebra, Const[Unit, ?]]
   override def clientEventInterpreter: ClientEventInterpreter = implicitly

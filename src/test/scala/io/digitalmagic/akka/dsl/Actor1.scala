@@ -19,7 +19,7 @@ object Actor1 {
     def getValue: Program[Int] = GetValue
   }
 
-  def interpreter(actorSelection: ActorSelection): Query ~> QueryFuture = Lambda[Query ~> QueryFuture] {
+  def interpreter(actorSelection: ActorSelection): Query ~> RequestFuture = Lambda[Query ~> RequestFuture] {
     case q: GetValue.type => actorSelection query q
   }
 
@@ -72,7 +72,7 @@ class Actor1 extends Actor1Programs with EventSourcedActorWithInterpreter {
   override def entityId: Unit = ()
   override def persistenceId: String = s"${context.system.name}.Actor1"
 
-  override def interpreter: QueryAlgebra ~> QueryFuture = CopK.NaturalTransformation.summon[QueryAlgebra, QueryFuture]
+  override def interpreter: QueryAlgebra ~> RequestFuture = CopK.NaturalTransformation.summon[QueryAlgebra, RequestFuture]
   override def indexInterpreter: Index#Algebra ~> IndexFuture = CopK.NaturalTransformation.summon[Index#Algebra, IndexFuture]
   override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, ?] = CopK.NaturalTransformation.summon[Index#ClientAlgebra, Const[Unit, ?]]
   override def clientEventInterpreter: ClientEventInterpreter = implicitly

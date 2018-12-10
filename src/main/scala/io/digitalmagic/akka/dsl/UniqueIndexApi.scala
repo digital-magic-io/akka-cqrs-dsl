@@ -1,6 +1,6 @@
 package io.digitalmagic.akka.dsl
 
-import akka.actor.ActorSelection
+import akka.actor.{ActorRef, ActorSelection}
 import io.digitalmagic.akka.dsl.API._
 import iotaz.{Cop, CopK}
 import scalaz._
@@ -141,6 +141,15 @@ trait UniqueIndexApi {
     def release(key: KeyType): Program[Unit] = Release(key)
   }
 
+  trait LowLevelApi {
+    def startAcquisition(entityId: EntityIdType, key: KeyType): RequestFuture[Unit]
+    def commitAcquisition(entityId: EntityIdType, key: KeyType): Unit
+    def rollbackAcquisition(entityId: EntityIdType, key: KeyType): Unit
+    def startRelease(entityId: EntityIdType, key: KeyType): RequestFuture[Unit]
+    def commitRelease(entityId: EntityIdType, key: KeyType): Unit
+    def rollbackRelease(entityId: EntityIdType, key: KeyType): Unit
+  }
+
   type ClientQueryType[T] >: ClientQuery[T] <: ClientQuery[T]
   // cannot be trait otherwise due to scala bug pattern matching does not work
   sealed abstract class ClientQuery[T] extends Query[T] with ApiAsset {
@@ -194,7 +203,22 @@ trait UniqueIndexApi {
   }
 }
 
-trait ActorBasedUniqueIndex[A <: UniqueIndexApi] {
-  def entityActor: ActorSelection
-  def indexActor: ActorSelection
+trait UniqueIndexInterface[I <: UniqueIndexApi] {
+  def clientApiInterpreter(api: I): api.ClientQuery ~> RequestFuture
+  def lowLevelApi(api: I): api.LowLevelApi
+}
+
+case class ActorBasedUniqueIndex[I <: UniqueIndexApi](entityActor: ActorSelection, indexActor: ActorSelection) extends UniqueIndexInterface[I] {
+  override def clientApiInterpreter(api: I): api.ClientQuery ~> RequestFuture = Lambda[api.ClientQuery ~> RequestFuture] {
+    case q: api.IsIndexNeeded => entityActor query q
+  }
+
+  override def lowLevelApi(api: I): api.LowLevelApi = new api.LowLevelApi {
+    override def startAcquisition(entityId: api.EntityIdType, key: api.KeyType): RequestFuture[Unit] = indexActor.command(api.StartAcquisition(entityId, key)).asFuture
+    override def commitAcquisition(entityId: api.EntityIdType, key: api.KeyType): Unit = indexActor.tell(api.CommitAcquisition(entityId, key), ActorRef.noSender)
+    override def rollbackAcquisition(entityId: api.EntityIdType, key: api.KeyType): Unit = indexActor.tell(api.RollbackAcquisition(entityId, key), ActorRef.noSender)
+    override def startRelease(entityId: api.EntityIdType, key: api.KeyType): RequestFuture[Unit] = indexActor.command(api.StartRelease(entityId, key)).asFuture
+    override def commitRelease(entityId: api.EntityIdType, key: api.KeyType): Unit = indexActor.tell(api.CommitRelease(entityId, key), ActorRef.noSender)
+    override def rollbackRelease(entityId: api.EntityIdType, key: api.KeyType): Unit = indexActor.tell(api.RollbackRelease(entityId, key), ActorRef.noSender)
+  }
 }

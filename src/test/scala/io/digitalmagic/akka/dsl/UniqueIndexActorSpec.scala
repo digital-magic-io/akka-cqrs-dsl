@@ -13,7 +13,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 object UniqueIndexActorSpec {
-  case object myIndexApi extends UniqueIndexApi.Base[String, String]
+  implicit case object myIndexApi extends UniqueIndexApi.Base[String, String]
 }
 
 object EntityActor {
@@ -48,10 +48,7 @@ class UniqueIndexActorSpec(system: ActorSystem) extends TestKit(system) with Imp
     TestKit.shutdownActorSystem(system)
   }
 
-  implicit val index = new ActorBasedUniqueIndex[myIndexApi.type] {
-    override def entityActor: ActorSelection = system.actorSelection("user/entity")
-    override def indexActor: ActorSelection = system.actorSelection("system/sharding/index")
-  }
+  implicit val index = new ActorBasedUniqueIndex[myIndexApi.type](system.actorSelection("user/entity"), system.actorSelection("system/sharding/index"))
   private val clusterSharding = ClusterSharding(system)
   private val indexActor = UniqueIndexActorDef(myIndexApi, "index").start(clusterSharding, ClusterShardingSettings(system))
 

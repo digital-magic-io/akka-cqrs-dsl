@@ -152,7 +152,7 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
   def indexKey: KeyType = keyToString.fromString(entityId).get
 }
 
-case class UniqueIndexActorDef[A <: UniqueIndexApi](indexApi: A, name: String, passivateIn: FiniteDuration = 5 seconds, numberOfShards: Int = 100)(implicit A: ActorBasedUniqueIndex[A]) {
+case class UniqueIndexActorDef[I <: UniqueIndexApi](indexApi: I, name: String, passivateIn: FiniteDuration = 5 seconds, numberOfShards: Int = 100)(implicit I: UniqueIndexInterface[I]) {
   def extractEntityId: ExtractEntityId = {
     case msg: indexApi.UniqueIndexRequest[_] => (indexApi.keyToString.asString(msg.key), msg)
   }
@@ -162,7 +162,7 @@ case class UniqueIndexActorDef[A <: UniqueIndexApi](indexApi: A, name: String, p
   }
 
   def props(entityId: String): Props =
-    Props(new UniqueIndexActor[A](indexApi, name, entityId, passivateIn)(A))
+    Props(UniqueIndexActor(indexApi, name, entityId, passivateIn)(I))
 
   def start(clusterSharding: ClusterSharding, settings: ClusterShardingSettings): ActorRef = {
     clusterSharding.startProperly(
@@ -176,17 +176,13 @@ case class UniqueIndexActorDef[A <: UniqueIndexApi](indexApi: A, name: String, p
   }
 }
 
-case class UniqueIndexActor[I <: UniqueIndexApi](indexApi: I, name: String, entityId: String, passivateIn: FiniteDuration = 5 seconds)(A: ActorBasedUniqueIndex[I]) extends UniqueIndexPrograms with EventSourcedActorWithInterpreter {
+case class UniqueIndexActor[I <: UniqueIndexApi](indexApi: I, name: String, entityId: String, passivateIn: FiniteDuration = 5 seconds)(implicit I: UniqueIndexInterface[I]) extends UniqueIndexPrograms with EventSourcedActorWithInterpreter {
   import indexApi._
 
   context.setReceiveTimeout(passivateIn)
 
-  implicit val clientQueryInterpreter: ClientQuery ~> QueryFuture = Lambda[ClientQuery ~> QueryFuture] {
-    case q: IsIndexNeeded => A.entityActor query q
-  }
-
   override type QueryAlgebra[T] = CopK[ClientQuery ::: TNilK, T]
-  override def interpreter: QueryAlgebra ~> QueryFuture = CopK.NaturalTransformation.summon[QueryAlgebra, QueryFuture]
+  override def interpreter: QueryAlgebra ~> RequestFuture = CopK.NaturalTransformation.of[QueryAlgebra, RequestFuture](I.clientApiInterpreter(indexApi))
   override def indexInterpreter: Index#Algebra ~> IndexFuture = CopK.NaturalTransformation.summon[Index#Algebra, IndexFuture]
   override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, ?] = CopK.NaturalTransformation.summon[Index#ClientAlgebra, Const[Unit, ?]]
   override def clientEventInterpreter: ClientEventInterpreter = implicitly

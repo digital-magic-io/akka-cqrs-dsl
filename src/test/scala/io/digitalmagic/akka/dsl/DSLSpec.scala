@@ -226,15 +226,8 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
     "support unique indexes" in {
       import IndexExample._
 
-      implicit val index1 = new ActorBasedUniqueIndex[index1Api.type] {
-        override def entityActor: ActorSelection = system.actorSelection("system/sharding/example")
-        override def indexActor: ActorSelection = system.actorSelection("system/sharding/index1")
-      }
-
-      implicit val index2 = new ActorBasedUniqueIndex[index2Api.type] {
-        override def entityActor: ActorSelection = system.actorSelection("system/sharding/example")
-        override def indexActor: ActorSelection = system.actorSelection("system/sharding/index2")
-      }
+      implicit val index1 = new ActorBasedUniqueIndex[index1Api.type](system.actorSelection("system/sharding/example"), system.actorSelection("system/sharding/index1"))
+      implicit val index2 = new ActorBasedUniqueIndex[index2Api.type](system.actorSelection("system/sharding/example"), system.actorSelection("system/sharding/index2"))
 
       val clusterSharding = ClusterSharding(system)
       val clusterShardingSettings = ClusterShardingSettings(system)

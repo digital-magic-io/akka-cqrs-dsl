@@ -46,13 +46,13 @@ object API {
     override def failure(error: ResponseError): QueryResult[T] = QueryResult(Left(error))
   }
 
-  case class QueryFuture[T](f: ExecutionContext => Future[T]) extends Function[ExecutionContext, Future[T]] {
+  case class RequestFuture[T](f: ExecutionContext => Future[T]) extends Function[ExecutionContext, Future[T]] {
     override def apply(ec: ExecutionContext): Future[T] = f(ec)
   }
 
-  object QueryFuture {
-    implicit def queryFutureFunctor: Functor[QueryFuture] = new Functor[QueryFuture] {
-      override def map[A, B](fa: QueryFuture[A])(f: A => B): QueryFuture[B] = QueryFuture(implicit ec => fa(ec).map(f))
+  object RequestFuture {
+    implicit def requestFutureFunctor: Functor[RequestFuture] = new Functor[RequestFuture] {
+      override def map[A, B](fa: RequestFuture[A])(f: A => B): RequestFuture[B] = RequestFuture(implicit ec => fa(ec).map(f))
     }
   }
 
@@ -93,10 +93,10 @@ object API {
       }
     }
 
-    def asFuture: QueryFuture[T] = QueryFuture(implicit ex => map(identity))
+    def asFuture: RequestFuture[T] = RequestFuture(implicit ex => map(identity))
   }
 
-  implicit def queryProcessorToFuture[T](queryProcessor: QueryProcessor[T]): QueryFuture[T] = queryProcessor.asFuture
+  implicit def queryProcessorToFuture[T](queryProcessor: QueryProcessor[T]): RequestFuture[T] = queryProcessor.asFuture
 
   sealed case class CommandProcessor[T](whom: Either[ActorRef, ActorSelection], msg: Command[T])(implicit tag: ClassTag[T], val akkaTimeout: Timeout = 5 seconds) {
 
@@ -121,6 +121,8 @@ object API {
         case z => Future.failed(new IllegalArgumentException(s"$path ? $msg replied with unexpected $z"))
       }
     }
+
+    def asFuture: RequestFuture[T] = RequestFuture(implicit ex => map(identity))
   }
 
 }

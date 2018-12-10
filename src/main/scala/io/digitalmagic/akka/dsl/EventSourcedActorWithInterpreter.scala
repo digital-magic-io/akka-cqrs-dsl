@@ -68,7 +68,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   type MaybeProgram[A] = Option[Program[A]]
 
   def entityId: EntityIdType
-  def interpreter: QueryAlgebra ~> QueryFuture
+  def interpreter: QueryAlgebra ~> RequestFuture
   def indexInterpreter: Index#Algebra ~> IndexFuture
   def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, ?]
 
@@ -210,7 +210,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   }
 
   implicit def interpretIndex[I <: UniqueIndexApi, T[_]](implicit api: UniqueIndexApi.IndexApiAux[EntityIdType, I, T],
-                                                         A: ActorBasedUniqueIndex[I]): T ~> IndexFuture = new (T ~> IndexFuture) {
+                                                         A: UniqueIndexInterface[I]): T ~> IndexFuture = new (T ~> IndexFuture) {
 
     override def apply[A](fa: T[A]): IndexFuture[A] = api.castIndexApi(fa) match {
       case api.Acquire(key) =>
@@ -220,11 +220,11 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
           val p = Promise[IndexResult[Unit]]
           persist(api.AcquisitionStartedClientEvent(key)) { event =>
             processIndexEvent(event)
-            A.indexActor command api.StartAcquisition(entityId, key) map identity onComplete {
+            A.lowLevelApi(api).startAcquisition(entityId, key)(dispatcher) onComplete {
               case TrySuccess(result) => p.success((
                 f => f(),
-                () => A.indexActor.tell(api.CommitAcquisition(entityId, key), ActorRef.noSender),
-                () => A.indexActor.tell(api.RollbackAcquisition(entityId, key), ActorRef.noSender),
+                () => A.lowLevelApi(api).commitAcquisition(entityId, key),
+                () => A.lowLevelApi(api).rollbackAcquisition(entityId, key),
                 result
               ))
               case TryFailure(cause) => p.failure(cause)
@@ -234,7 +234,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
         }
       case api.Release(key) =>
         if (state.indexesState.get(api).exists(_.contains(key))) {
-          A.indexActor command api.StartRelease(entityId, key) map { result =>
+          A.lowLevelApi(api).startRelease(entityId, key)(dispatcher) map { result =>
             (
               f => {
                 persist(api.ReleaseStartedClientEvent(key)) { event =>
@@ -242,8 +242,8 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
                   f()
                 }
               },
-              () => A.indexActor.tell(api.CommitRelease(entityId, key), ActorRef.noSender),
-              () => A.indexActor.tell(api.RollbackRelease(entityId, key), ActorRef.noSender),
+              () => A.lowLevelApi(api).commitRelease(entityId, key),
+              () => A.lowLevelApi(api).rollbackRelease(entityId, key),
               result
             )
           }
