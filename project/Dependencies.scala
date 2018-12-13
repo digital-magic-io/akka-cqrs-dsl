@@ -9,7 +9,7 @@ object Dependencies {
     val simulacrum              = "0.14.0"
     val sparyJson               = "1.3.5"
     val kryoVersion             = "4.0.2"
-    val akka                    = "2.5.18"
+    val akka                    = "2.5.19"
     val scalaTest               = "3.0.5"
     val akkaPersistenceInMemory = "2.5.1.1"
   }

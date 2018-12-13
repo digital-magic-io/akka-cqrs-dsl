@@ -214,10 +214,10 @@ case class ActorBasedUniqueIndex[I <: UniqueIndexApi](entityActor: ActorSelectio
   }
 
   override def lowLevelApi(api: I): api.LowLevelApi = new api.LowLevelApi {
-    override def startAcquisition(entityId: api.EntityIdType, key: api.KeyType): RequestFuture[Unit] = indexActor.command(api.StartAcquisition(entityId, key)).asFuture
+    override def startAcquisition(entityId: api.EntityIdType, key: api.KeyType): RequestFuture[Unit] = indexActor.command(api.StartAcquisition(entityId, key))
     override def commitAcquisition(entityId: api.EntityIdType, key: api.KeyType): Unit = indexActor.tell(api.CommitAcquisition(entityId, key), ActorRef.noSender)
     override def rollbackAcquisition(entityId: api.EntityIdType, key: api.KeyType): Unit = indexActor.tell(api.RollbackAcquisition(entityId, key), ActorRef.noSender)
-    override def startRelease(entityId: api.EntityIdType, key: api.KeyType): RequestFuture[Unit] = indexActor.command(api.StartRelease(entityId, key)).asFuture
+    override def startRelease(entityId: api.EntityIdType, key: api.KeyType): RequestFuture[Unit] = indexActor.command(api.StartRelease(entityId, key))
     override def commitRelease(entityId: api.EntityIdType, key: api.KeyType): Unit = indexActor.tell(api.CommitRelease(entityId, key), ActorRef.noSender)
     override def rollbackRelease(entityId: api.EntityIdType, key: api.KeyType): Unit = indexActor.tell(api.RollbackRelease(entityId, key), ActorRef.noSender)
   }

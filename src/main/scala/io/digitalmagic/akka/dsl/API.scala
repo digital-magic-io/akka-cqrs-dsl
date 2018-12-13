@@ -125,4 +125,5 @@ object API {
     def asFuture: RequestFuture[T] = RequestFuture(implicit ex => map(identity))
   }
 
+  implicit def commandProcessorToFuture[T](commandProcessor: CommandProcessor[T]): RequestFuture[T] = commandProcessor.asFuture
 }
