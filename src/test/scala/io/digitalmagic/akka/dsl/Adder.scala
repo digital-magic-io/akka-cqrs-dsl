@@ -3,7 +3,7 @@ package io.digitalmagic.akka.dsl
 import akka.actor.Props
 import io.digitalmagic.akka.dsl.API._
 import iotaz.TListK.:::
-import iotaz.{Cop, CopK, TNil, TNilK}
+import iotaz.{CopK, TNilK}
 import scalaz._
 import Scalaz._
 

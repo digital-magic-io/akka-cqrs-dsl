@@ -2,7 +2,7 @@ package io.digitalmagic.akka.dsl
 
 import akka.actor.{ActorSelection, Props}
 import io.digitalmagic.akka.dsl.API._
-import iotaz.{Cop, CopK, TNilK}
+import iotaz.{CopK, TNilK}
 import scalaz._
 import Scalaz._
 
