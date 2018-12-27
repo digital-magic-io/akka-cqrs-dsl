@@ -204,8 +204,8 @@ object Json extends DefaultJsonProtocol {
     }
   }
 
-  def clientStateFormat(persistentStateFormat: JsonFormat[PersistentState]): RootJsonFormat[EventSourcedActorWithInterpreter.EventSourcedActorState[PersistentState]] = new RootJsonFormat[EventSourcedActorWithInterpreter.EventSourcedActorState[PersistentState]] {
-    override def read(json: JsValue): EventSourcedActorWithInterpreter.EventSourcedActorState[PersistentState] = {
+  implicit def clientStateFormat[T <: PersistentState](implicit persistentStateFormat: JsonFormat[T]): RootJsonFormat[EventSourcedActorWithInterpreter.EventSourcedActorState[T]] = new RootJsonFormat[EventSourcedActorWithInterpreter.EventSourcedActorState[T]] {
+    override def read(json: JsValue): EventSourcedActorWithInterpreter.EventSourcedActorState[T] = {
       val fields = json.asJsObject.fields
       EventSourcedActorWithInterpreter.EventSourcedActorState(
         persistentStateFormat.read(fields("underlying")),
@@ -213,7 +213,7 @@ object Json extends DefaultJsonProtocol {
       )
     }
 
-    override def write(obj: EventSourcedActorWithInterpreter.EventSourcedActorState[PersistentState]): JsValue = {
+    override def write(obj: EventSourcedActorWithInterpreter.EventSourcedActorState[T]): JsValue = {
       JsObject(
         "underlying" -> persistentStateFormat.write(obj.underlying),
         "indexesState" -> obj.indexesState.toJson

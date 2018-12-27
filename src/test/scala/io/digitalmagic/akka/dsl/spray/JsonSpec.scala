@@ -21,7 +21,7 @@ object JsonSpec {
     override def write(obj: MyState): JsValue = JsObject("n" -> obj.n.toJson)
   }
 
-  val stateFormat: JsonFormat[PersistentState] = new JsonFormat[PersistentState] {
+  implicit val stateFormat: JsonFormat[PersistentState] = new JsonFormat[PersistentState] {
     override def read(json: JsValue): PersistentState = {
       val fields = json.asJsObject.fields
       fields("type").convertTo[String] match {
@@ -150,8 +150,8 @@ class JsonSpec extends WordSpecLike with Matchers {
         api1 -> api1.ClientIndexesState(Map("abc" -> api1.AcquisitionPendingClientState(), "def" -> api1.ReleasePendingClientState(), "ghi" -> api1.AcquiredClientState())),
         api2 -> api2.ClientIndexesState(Map(1 -> api2.AcquisitionPendingClientState(), 2 -> api2.ReleasePendingClientState(), 3 -> api2.AcquiredClientState()))
       )))
-      val serialized = clientStateFormat(stateFormat).write(state)
-      val deserialized = clientStateFormat(stateFormat).read(serialized)
+      val serialized = state.toJson
+      val deserialized = serialized.convertTo[EventSourcedActorState[MyState]]
       deserialized shouldBe state
     }
   }
