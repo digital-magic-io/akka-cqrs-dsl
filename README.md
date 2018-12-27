@@ -4,7 +4,7 @@ A convenient DSL for Command/Query Actor communication.
 
 # Usage
 Simply add the appropriate `Command` or `Query` trait to your messages, and you're good to go:
-```
+```scala
 import io.digitalmagic.akka.dsl.API._
 
 case object GetValue extends Query[Int]
