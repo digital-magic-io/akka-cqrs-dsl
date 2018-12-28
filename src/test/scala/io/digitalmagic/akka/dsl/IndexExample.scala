@@ -99,7 +99,7 @@ case class IndexExampleActor(entityId: String)(implicit I1: UniqueIndexInterface
   override def persistenceId = s"${context.system.name}.IndexExample.v1.$entityId"
   override def getEnvironment(r: API.Request[_]): Environment = ()
 
-  override def processState(s: Any): Option[State] = s match {
+  override def processSnapshot(s: Any): Option[State] = s match {
     case x: State => Some(x)
     case _ => None
   }

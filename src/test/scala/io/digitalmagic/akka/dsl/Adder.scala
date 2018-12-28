@@ -74,7 +74,7 @@ class Adder()(implicit val api1: Actor1.Query ~> RequestFuture, val api2: Actor2
 
   override def getEnvironment(r: Request[_]): Unit = ()
 
-  override def processState(s: Any): Option[State] = s match {
+  override def processSnapshot(s: Any): Option[State] = s match {
     case x: State => Some(x)
     case _ => None
   }

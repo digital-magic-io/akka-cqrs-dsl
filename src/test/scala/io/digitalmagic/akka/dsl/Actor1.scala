@@ -79,7 +79,7 @@ class Actor1 extends Actor1Programs with EventSourcedActorWithInterpreter {
 
   override def getEnvironment(r: Request[_]): Unit = ()
 
-  override def processState(s: Any): Option[State] = s match {
+  override def processSnapshot(s: Any): Option[State] = s match {
     case x: State => Some(x)
     case _ => None
   }

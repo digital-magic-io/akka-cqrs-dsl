@@ -190,7 +190,7 @@ case class UniqueIndexActor[I <: UniqueIndexApi](indexApi: I, name: String, enti
   override val persistenceId = s"${context.system.name}.UniqueIndexActor.$name.v1.$entityId"
   override def getEnvironment(r: Request[_]): Unit = ()
 
-  override def processState(s: Any): Option[State] = s match {
+  override def processSnapshot(s: Any): Option[State] = s match {
     case x: State => Some(x)
     case _ => None
   }

@@ -127,11 +127,11 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
     }
   }
 
-  def processState(s: Any): Option[State]
+  def processSnapshot(s: Any): Option[State]
 
   override def receiveRecoverSnapshotOffer(metadata: SnapshotMetadata, snapshot: Any): Unit = snapshot match{
     case s: EventSourcedActorState[_] =>
-      processState(s.underlying) match {
+      processSnapshot(s.underlying) match {
         case Some(x) =>
           state = EventSourcedActorState(x, s.indexesState)
         case None =>
