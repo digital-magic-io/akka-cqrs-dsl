@@ -1,6 +1,6 @@
 name         := "akka-cqrs-dsl"
 organization := "io.digital-magic"
-version      := "2.0-M3"  // don't forget to bump version in .bintray.json
+version      := "2.0"  // don't forget to bump version in .bintray.json
 
 organizationHomepage := Some(url("http://www.digital-magic.io"))
 startYear            := Some(2016)
