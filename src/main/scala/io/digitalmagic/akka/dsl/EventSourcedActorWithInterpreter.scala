@@ -65,7 +65,6 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   type IndexResult[T] = ((() => Unit) => Unit, () => Unit, () => Unit, T)
   type IndexFuture[T] = Future[IndexResult[T]]
   implicit val indexFutureFunctor: Functor[IndexFuture] = Functor[Future] compose Functor[IndexResult]
-  type MaybeProgram[A] = Option[Program[A]]
 
   def entityId: EntityIdType
   def interpreter: QueryAlgebra ~> RequestFuture
@@ -76,9 +75,6 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   implicit def genClientEventInterpreter(implicit interpreters: evidence.All[TList.Op.Map[ClientEventInterpreterS[EntityIdType, ?], Index#ClientEventList]]): ClientEventInterpreter =
     e => s => interpreters.underlying.values(e.index).asInstanceOf[ClientEventInterpreterS[EntityIdType, Any]](e.value, s)
   def clientEventInterpreter: ClientEventInterpreter
-
-  def getEnvironment(r: Request[_]): Environment
-  def getProgram: Request ~> MaybeProgram
 
   private var state: EventSourcedActorState[State] = EventSourcedActorState(persistentState.empty)
   private var needsPassivation: Boolean = false
@@ -126,8 +122,6 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
 
     }
   }
-
-  def processSnapshot(s: Any): Option[State]
 
   override def receiveRecoverSnapshotOffer(metadata: SnapshotMetadata, snapshot: Any): Unit = snapshot match{
     case s: EventSourcedActorState[_] =>

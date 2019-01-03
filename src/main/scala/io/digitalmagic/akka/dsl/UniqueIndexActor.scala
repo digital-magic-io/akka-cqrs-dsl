@@ -150,6 +150,18 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
 
   def entityId: String
   def indexKey: KeyType = keyToString.fromString(entityId).get
+
+  override def getEnvironment(r: Request[_]): Unit = ()
+
+  override def processSnapshot(s: Any): Option[State] = s match {
+    case x: State => Some(x)
+    case _ => None
+  }
+
+  override def getProgram: Request ~> MaybeProgram = Lambda[Request ~> MaybeProgram] {
+    case r: UniqueIndexRequest[_] => Some(requestToProgram(r))
+    case _ => None
+  }
 }
 
 case class UniqueIndexActorDef[I <: UniqueIndexApi](indexApi: I, name: String, passivateIn: FiniteDuration = 5 seconds, numberOfShards: Int = 100)(implicit I: UniqueIndexInterface[I]) {
@@ -188,15 +200,4 @@ case class UniqueIndexActor[I <: UniqueIndexApi](indexApi: I, name: String, enti
   override def clientEventInterpreter: ClientEventInterpreter = implicitly
 
   override val persistenceId = s"${context.system.name}.UniqueIndexActor.$name.v1.$entityId"
-  override def getEnvironment(r: Request[_]): Unit = ()
-
-  override def processSnapshot(s: Any): Option[State] = s match {
-    case x: State => Some(x)
-    case _ => None
-  }
-
-  override def getProgram: Request ~> MaybeProgram = Lambda[Request ~> MaybeProgram] {
-    case r: UniqueIndexRequest[_] => Some(requestToProgram(r))
-    case _ => None
-  }
 }

@@ -69,7 +69,19 @@ trait IndexExample extends EventSourcedPrograms {
     _ <- a1.release("ghi")
     _ <- a2.release("ghi")
   } yield ()
-  def entityId: String
+
+  override def getEnvironment(r: API.Request[_]): Environment = ()
+
+  override def processSnapshot(s: Any): Option[State] = s match {
+    case x: State => Some(x)
+    case _ => None
+  }
+
+  override def getProgram: Request ~> MaybeProgram = Lambda[Request ~> MaybeProgram] {
+    case AcquireCommand(_, fail) => Some(acquire(fail))
+    case ReleaseCommand(_) => Some(release)
+    case _ => None
+  }
 }
 
 object IndexExampleActor {
@@ -97,15 +109,4 @@ case class IndexExampleActor(entityId: String)(implicit I1: UniqueIndexInterface
   override def clientEventInterpreter: ClientEventInterpreter = implicitly
 
   override def persistenceId = s"${context.system.name}.IndexExample.v1.$entityId"
-  override def getEnvironment(r: API.Request[_]): Environment = ()
-
-  override def processSnapshot(s: Any): Option[State] = s match {
-    case x: State => Some(x)
-    case _ => None
-  }
-
-  override def getProgram: Request ~> MaybeProgram = Lambda[Request ~> MaybeProgram] {
-    case AcquireCommand(_, fail) => Some(acquire(fail))
-    case ReleaseCommand(_) => Some(release)
-  }
 }

@@ -1,7 +1,7 @@
 package io.digitalmagic.akka.dsl
 
 import akka.event.LoggingAdapter
-import io.digitalmagic.akka.dsl.API.ResponseError
+import io.digitalmagic.akka.dsl.API.{Request, ResponseError}
 import iotaz.CopK
 import scalaz._
 import Scalaz._
@@ -14,6 +14,12 @@ trait EventSourcedPrograms extends EventSourced {
   type Events = Vector[EventType]
   type Log = Vector[LoggingAdapter => Unit]
   type Environment
+
+  type MaybeProgram[A] = Option[Program[A]]
+
+  def getEnvironment(r: Request[_]): Environment
+  def getProgram: Request ~> MaybeProgram
+  def processSnapshot(s: Any): Option[State]
 
   protected type QueryAlgebra[A] <: CopK[_, A]
   protected val algebraIsQuery: IsQuery[QueryAlgebra]

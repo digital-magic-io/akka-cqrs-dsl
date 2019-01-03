@@ -64,18 +64,6 @@ trait Actor1Programs extends EventSourcedPrograms {
     _ <- log(_.info("setting value"))
     _ <- emit(ValueSet(value))
   } yield ()
-}
-
-class Actor1 extends Actor1Programs with EventSourcedActorWithInterpreter {
-  import Actor1._
-
-  override def entityId: Unit = ()
-  override def persistenceId: String = s"${context.system.name}.Actor1"
-
-  override def interpreter: QueryAlgebra ~> RequestFuture = CopK.NaturalTransformation.summon[QueryAlgebra, RequestFuture]
-  override def indexInterpreter: Index#Algebra ~> IndexFuture = CopK.NaturalTransformation.summon[Index#Algebra, IndexFuture]
-  override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, ?] = CopK.NaturalTransformation.summon[Index#ClientAlgebra, Const[Unit, ?]]
-  override def clientEventInterpreter: ClientEventInterpreter = implicitly
 
   override def getEnvironment(r: Request[_]): Unit = ()
 
@@ -89,4 +77,14 @@ class Actor1 extends Actor1Programs with EventSourcedActorWithInterpreter {
     case SetValue(value) => Some(setValue(value))
     case _ => None
   }
+}
+
+class Actor1 extends Actor1Programs with EventSourcedActorWithInterpreter {
+  override def entityId: Unit = ()
+  override def persistenceId: String = s"${context.system.name}.Actor1"
+
+  override def interpreter: QueryAlgebra ~> RequestFuture = CopK.NaturalTransformation.summon[QueryAlgebra, RequestFuture]
+  override def indexInterpreter: Index#Algebra ~> IndexFuture = CopK.NaturalTransformation.summon[Index#Algebra, IndexFuture]
+  override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, ?] = CopK.NaturalTransformation.summon[Index#ClientAlgebra, Const[Unit, ?]]
+  override def clientEventInterpreter: ClientEventInterpreter = implicitly
 }
