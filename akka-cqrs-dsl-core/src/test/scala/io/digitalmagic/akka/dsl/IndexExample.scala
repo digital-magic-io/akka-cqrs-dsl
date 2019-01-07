@@ -18,8 +18,13 @@ object IndexExample {
     override type EventType = MyEvent
   }
 
+  sealed trait Action
+  case class AcquireAction(key: String) extends Action
+  case class ReleaseAction(key: String) extends Action
+
   case class AcquireCommand(entityId: String, fail: Boolean) extends Command[Unit]
   case class ReleaseCommand(entityId: String) extends Command[Unit]
+  case class GenericCommand(entityId: String, actions: List[Action]) extends Command[Unit]
 
   @SerialVersionUID(1)
   implicit case object index1Api extends UniqueIndexApi.Base[String, String]
@@ -70,6 +75,13 @@ trait IndexExample extends EventSourcedPrograms {
     _ <- a2.release("ghi")
   } yield ()
 
+  def genericCommand(actions: List[Action]): Program[Unit] = for {
+    _ <- actions.reverse.foldMapM {
+      case AcquireAction(key) => a1.acquire(key)
+      case ReleaseAction(key) => a1.release(key)
+    }
+  } yield ()
+
   override def getEnvironment(r: API.Request[_]): Environment = ()
 
   override def processSnapshot(s: Any): Option[State] = s match {
@@ -80,6 +92,7 @@ trait IndexExample extends EventSourcedPrograms {
   override def getProgram: Request ~> MaybeProgram = Lambda[Request ~> MaybeProgram] {
     case AcquireCommand(_, fail) => Some(acquire(fail))
     case ReleaseCommand(_) => Some(release)
+    case GenericCommand(_, actions) => Some(genericCommand(actions))
     case _ => None
   }
 }
@@ -89,6 +102,7 @@ object IndexExampleActor {
     case msg: UniqueIndexApi#ClientQuery[_] => (msg.Api.entityIdToString.asString(msg.reflect.entityId), msg)
     case msg: IndexExample.AcquireCommand => (msg.entityId, msg)
     case msg: IndexExample.ReleaseCommand => (msg.entityId, msg)
+    case msg: IndexExample.GenericCommand => (msg.entityId, msg)
   }
 
   def extractShardId: ExtractShardId = {

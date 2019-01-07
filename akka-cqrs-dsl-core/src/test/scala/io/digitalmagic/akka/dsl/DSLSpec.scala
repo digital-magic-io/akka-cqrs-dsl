@@ -265,5 +265,52 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
 
       Await.result(index1.indexActor query index1Api.GetEntityId("abc") map identity, 3 seconds) shouldBe None
      }
+
+    "correctly handle acquire-release and release-acquire command sequences" in {
+      import IndexExample._
+
+      implicit val index1 = new ActorBasedUniqueIndex[index1Api.type](system.actorSelection("system/sharding/example-2"), system.actorSelection("system/sharding/index1-2"))
+      implicit val index2 = new ActorBasedUniqueIndex[index2Api.type](system.actorSelection("system/sharding/example-2"), system.actorSelection("system/sharding/index2-2"))
+
+      val clusterSharding = ClusterSharding(system)
+      val clusterShardingSettings = ClusterShardingSettings(system)
+      val shardAllocationStrategy = clusterSharding.defaultShardAllocationStrategy(clusterShardingSettings)
+
+      UniqueIndexActorDef(index1Api, "index1-2").start(clusterSharding, clusterShardingSettings)
+      UniqueIndexActorDef(index2Api, "index2-2").start(clusterSharding, clusterShardingSettings)
+
+      clusterSharding.startProperly(
+        typeName = "example-2",
+        entityIdToEntityProps = IndexExampleActor.props,
+        settings = clusterShardingSettings,
+        extractEntityId = IndexExampleActor.extractEntityId,
+        extractShardId = IndexExampleActor.extractShardId,
+        allocationStrategy = shardAllocationStrategy,
+        handOffStopMessage = EventSourcedActorWithInterpreter.Stop
+      )
+
+      {
+        val resp = index1.entityActor command IndexExample.GenericCommand("e2", List(IndexExample.AcquireAction("key"), IndexExample.ReleaseAction("key"))) map identity
+        Await.result(resp, 3 seconds) shouldBe (())
+      }
+
+      Await.result(index1.indexActor query index1Api.GetEntityId("key") map identity, 3 seconds) shouldBe None
+
+      {
+        val resp = index1.entityActor command IndexExample.GenericCommand("e2", List(IndexExample.AcquireAction("key"))) map identity
+        Await.result(resp, 3 seconds) shouldBe (())
+      }
+
+      {
+        val resp = index1.entityActor command IndexExample.GenericCommand("e2", List(IndexExample.ReleaseAction("key"), IndexExample.AcquireAction("key"))) map identity
+        Await.result(resp, 3 seconds) shouldBe (())
+      }
+
+      {
+        val resp = index1.indexActor query index1Api.GetEntityId("key") map identity
+        val optionEntityId = Await.result(resp, 3 seconds)
+        optionEntityId shouldBe Some("e2")
+      }
+    }
   }
 }

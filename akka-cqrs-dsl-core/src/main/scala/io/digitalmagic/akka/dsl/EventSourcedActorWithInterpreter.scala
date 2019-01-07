@@ -5,6 +5,7 @@ import akka.cluster.sharding.ShardRegion.Passivate
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotMetadata, SnapshotOffer}
 import io.digitalmagic.akka.dsl.API._
 import scalaz._
+import scalaz.Tags._
 import Scalaz._
 import akka.event.{Logging, LoggingAdapter}
 import iotaz.{TList, evidence}
@@ -30,6 +31,71 @@ trait DummyActor extends PersistentActor {
 object EventSourcedActorWithInterpreter {
   case class EventSourcedActorState[+State <: PersistentState](underlying: State, indexesState: ClientIndexesStateMap = ClientIndexesStateMap())
   case object Stop
+
+  trait IndexPostActionKey {
+    type I <: UniqueIndexApi
+    val api: I
+    val key: api.KeyType
+  }
+  object IndexPostActionKey {
+    def apply[I0 <: UniqueIndexApi](a: I0)(k: a.KeyType): IndexPostActionKey = new IndexPostActionKey {
+      override type I = I0
+      override val api: I = a
+      override val key: api.KeyType = k.asInstanceOf[api.KeyType]
+      override def hashCode(): Int = key.hashCode()
+      override def equals(obj: Any): Boolean = obj match {
+        case that: IndexPostActionKey => equalsToKey(that)
+        case _ => false
+      }
+      def equalsToKey(that: IndexPostActionKey): Boolean = api == that.api && key == that.key
+      override def toString: String = s"$api-$key"
+    }
+  }
+  case class IndexPostAction(commit: () => Unit, commitEvent: Option[UniqueIndexApi#ClientEventType], rollback: () => Unit, rollbackEvent: Option[UniqueIndexApi#ClientEventType])
+  type IndexPostActionsMap = Map[IndexPostActionKey, IndexPostAction @@ LastVal]
+  case class IndexPostActions(actions: IndexPostActionsMap) {
+    def commit: () => Unit = () => actions.values.foreach(LastVal.unwrap(_).commit())
+    def commitEvents: Vector[UniqueIndexApi#ClientEventType] = actions.values.flatMap(LastVal.unwrap(_).commitEvent).toVector
+    def rollback: () => Unit = () => actions.values.foreach(LastVal.unwrap(_).rollback())
+    def rollbackEvents: Vector[UniqueIndexApi#ClientEventType] = actions.values.flatMap(LastVal.unwrap(_).rollbackEvent).toVector
+  }
+  object IndexPostActions {
+    implicit val indexPostActionsMonoid: Monoid[IndexPostActions] = Monoid.fromIso(Isomorphism.IsoSet[IndexPostActions, IndexPostActionsMap](_.actions, map => IndexPostActions(map)))
+    def apply[I <: UniqueIndexApi](api: I)(key: api.KeyType, commit: () => Unit, commitEvent: Option[api.ClientEventType], rollback: () => Unit, rollbackEvent: Option[api.ClientEventType]): IndexPostActions =
+      IndexPostActions(Map(IndexPostActionKey(api)(key) -> LastVal(IndexPostAction(commit, commitEvent, rollback, rollbackEvent))))
+
+    def commitAcquisition[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: UniqueIndexInterface[I]): IndexPostActions =
+      IndexPostActions(api)(key,
+        () => A.lowLevelApi(api).commitAcquisition(entityId, key),
+        Some(api.AcquisitionCompletedClientEvent(key)),
+        () => A.lowLevelApi(api).rollbackAcquisition(entityId, key),
+        Some(api.AcquisitionAbortedClientEvent(key))
+      )
+
+    def rollbackAcquisition[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: UniqueIndexInterface[I]): IndexPostActions =
+      IndexPostActions(api)(key,
+        () => A.lowLevelApi(api).rollbackAcquisition(entityId, key),
+        Some(api.AcquisitionAbortedClientEvent(key)),
+        () => A.lowLevelApi(api).commitAcquisition(entityId, key),
+        Some(api.AcquisitionCompletedClientEvent(key))
+      )
+
+    def commitRelease[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: UniqueIndexInterface[I]): IndexPostActions =
+      IndexPostActions(api)(key,
+        () => A.lowLevelApi(api).commitRelease(entityId, key),
+        Some(api.ReleaseCompletedClientEvent(key)),
+        () => A.lowLevelApi(api).rollbackRelease(entityId, key),
+        Some(api.ReleaseAbortedClientEvent(key))
+      )
+
+    def rollbackRelease[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: UniqueIndexInterface[I]): IndexPostActions =
+      IndexPostActions(api)(key,
+        () => A.lowLevelApi(api).rollbackRelease(entityId, key),
+        Some(api.ReleaseAbortedClientEvent(key)),
+        () => A.lowLevelApi(api).commitRelease(entityId, key),
+        Some(api.ReleaseCompletedClientEvent(key))
+      )
+  }
 }
 
 trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
@@ -61,7 +127,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
 
   implicit def unitToConstUnit[A](x: Unit): Const[Unit, A] = Const(x)
 
-  type IndexResult[T] = ((() => Unit) => Unit, () => Unit, () => Unit, T)
+  type IndexResult[T] = ((() => Unit) => Unit, IndexPostActions, T)
   type IndexFuture[T] = Future[IndexResult[T]]
   implicit val indexFutureFunctor: Functor[IndexFuture] = Functor[Future] compose Functor[IndexResult]
 
@@ -148,7 +214,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
 
   abstract override def receiveRecoverRecoveryComplete(): Unit = {
     super.receiveRecoverRecoveryComplete()
-    rollback(false, () => ())
+    rollback(false, IndexPostActions.indexPostActionsMonoid.zero)
   }
 
   override protected def onPersistRejected(cause: Throwable, event: Any, seqNr: Long): Unit = {
@@ -156,21 +222,15 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
     context.stop(self)
   }
 
-  def rollback(normalMode: Boolean, onRollback: () => Unit): Unit = {
-    val events = state.indexesState.map.keySet.toVector.flatMap { api =>
-      state.indexesState.get(api).get.map.flatMap {
-        case (key, api.AcquisitionPendingClientState()) => Some(api.AcquisitionAbortedClientEvent(key))
-        case (key, api.ReleasePendingClientState()) => Some(api.ReleaseAbortedClientEvent(key))
-        case _ => None
-      }
-    }
+  def rollback(normalMode: Boolean, postActions: IndexPostActions): Unit = {
+    val events = postActions.rollbackEvents
 
     persistEvents(events)(
       handler = { event =>
         processIndexEvent(event)
       },
       completion = { _ =>
-        onRollback()
+        postActions.rollback()
         if (normalMode) {
           deactivateStashingBehaviour()
         }
@@ -178,15 +238,8 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
     )
   }
 
-  def commit(events: Events, onCommit: () => Unit)(completion: () => Unit): Unit = {
-    val indexEvents = state.indexesState.map.keySet.toVector.flatMap { api =>
-      val indexes = state.indexesState.get(api).get
-      indexes.map.toVector.flatMap {
-        case (key, api.AcquisitionPendingClientState()) => Some(api.AcquisitionCompletedClientEvent(key))
-        case (key, api.ReleasePendingClientState()) => Some(api.ReleaseCompletedClientEvent(key))
-        case _ => None
-      }
-    }
+  def commit(events: Events, postActions: IndexPostActions)(completion: () => Unit): Unit = {
+    val indexEvents = postActions.commitEvents
 
     persistEvents(events ++ indexEvents)(
       handler = {
@@ -195,7 +248,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
         case _ =>
       },
       completion = { _ =>
-        onCommit()
+        postActions.commit()
         deactivateStashingBehaviour()
         completion()
       }
@@ -207,41 +260,49 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
 
     override def apply[A](fa: T[A]): IndexFuture[A] = api.castIndexApi(fa) match {
       case api.Acquire(key) =>
-        if (state.indexesState.get(api).exists(_.contains(key))) {
-          Future.successful((f => f(), () => (), () => (), ()))
-        } else {
-          val p = Promise[IndexResult[Unit]]
-          persist(api.AcquisitionStartedClientEvent(key)) { event =>
-            processIndexEvent(event)
-            A.lowLevelApi(api).startAcquisition(entityId, key)(dispatcher) onComplete {
-              case TrySuccess(result) => p.success((
-                f => f(),
-                () => A.lowLevelApi(api).commitAcquisition(entityId, key),
-                () => A.lowLevelApi(api).rollbackAcquisition(entityId, key),
-                result
-              ))
-              case TryFailure(cause) => p.failure(cause)
+        state.indexesState.get(api).flatMap(_.get(key)) match {
+          case None => // not yet acquired
+            val p = Promise[IndexResult[Unit]]
+            persist(api.AcquisitionStartedClientEvent(key)) { event =>
+              processIndexEvent(event)
+              A.lowLevelApi(api).startAcquisition(entityId, key)(dispatcher) onComplete {
+                case TrySuccess(result) => p.success((
+                  f => f(),
+                  IndexPostActions.commitAcquisition(api)(entityId, key),
+                  result
+                ))
+                case TryFailure(cause) => p.failure(cause)
+              }
             }
-          }
-          p.future
+            p.future
+          case Some(api.AcquisitionPendingClientState()) => // acquisition has been started
+            Future.successful((f => f(), IndexPostActions.commitAcquisition(api)(entityId, key), ()))
+          case Some(api.ReleasePendingClientState()) => // release has been started, so roll it back
+            Future.successful((f => f(), IndexPostActions.rollbackRelease(api)(entityId, key), ()))
+          case Some(api.AcquiredClientState()) => // already acquired
+            Future.successful((f => f(), IndexPostActions.indexPostActionsMonoid.zero, ()))
         }
       case api.Release(key) =>
-        if (state.indexesState.get(api).exists(_.contains(key))) {
-          A.lowLevelApi(api).startRelease(entityId, key)(dispatcher) map { result =>
-            (
-              f => {
-                persist(api.ReleaseStartedClientEvent(key)) { event =>
-                  processIndexEvent(event)
-                  f()
-                }
-              },
-              () => A.lowLevelApi(api).commitRelease(entityId, key),
-              () => A.lowLevelApi(api).rollbackRelease(entityId, key),
-              result
-            )
-          }
-        } else {
-          Future.successful((f => f(), () => (), () => (), ()))
+        state.indexesState.get(api).flatMap(_.get(key)) match {
+          case None => // not yet acquired
+            Future.successful((f => f(), IndexPostActions.indexPostActionsMonoid.zero, ()))
+          case Some(api.AcquisitionPendingClientState()) => // acquisition has been started, so roll it back
+            Future.successful((f => f(), IndexPostActions.rollbackAcquisition(api)(entityId, key), ()))
+          case Some(api.ReleasePendingClientState()) => // release has been started
+            Future.successful((f => f(), IndexPostActions.commitRelease(api)(entityId, key), ()))
+          case Some(api.AcquiredClientState()) => // already acquired
+            A.lowLevelApi(api).startRelease(entityId, key)(dispatcher) map { result =>
+              (
+                f => {
+                  persist(api.ReleaseStartedClientEvent(key)) { event =>
+                    processIndexEvent(event)
+                    f()
+                  }
+                },
+                IndexPostActions.commitRelease(api)(entityId, key),
+                result
+              )
+            }
         }
     }
   }
@@ -252,10 +313,9 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
     val environment: Environment
     def resume: StepResult[T]
     def continuation: (() => Unit) => Unit
-    def onCommit: () => Unit
-    def onRollback: () => Unit
-    def nextIndexStep(continuation: (() => Unit) => Unit, commit: () => Unit, rollback: () => Unit, rest: IndexStep[T]): NextStep =
-      NextStep(request, environment, continuation, onCommit >> commit, onRollback >> rollback, rest)
+    def postActions: IndexPostActions
+    def nextIndexStep(continuation: (() => Unit) => Unit, post: IndexPostActions, rest: IndexStep[T]): NextStep =
+      NextStep(request, environment, continuation, postActions |+| post, rest)
 
     def nextQueryStep(next: QueryStep[T]): NextStep = new NextStep with NoSerializationVerificationNeeded {
       override type T = NextStep.this.T
@@ -263,20 +323,18 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
       override val environment: Environment = NextStep.this.environment
       override def resume: StepResult[T] = next.resume.run
       override def continuation: (() => Unit) => Unit = f => f()
-      override def onCommit: () => Unit = NextStep.this.onCommit
-      override def onRollback: () => Unit = NextStep.this.onRollback
+      override def postActions: IndexPostActions = NextStep.this.postActions
     }
   }
 
   private object NextStep {
-    def apply[U](r: Request[U], env: Environment, c: (() => Unit) => Unit, comm: () => Unit, roll: () => Unit, s: IndexStep[U]): NextStep = new NextStep with NoSerializationVerificationNeeded {
+    def apply[U](r: Request[U], env: Environment, c: (() => Unit) => Unit, post: IndexPostActions, s: IndexStep[U]): NextStep = new NextStep with NoSerializationVerificationNeeded {
       override type T = U
       override val request: Request[T] = r
       override val environment: Environment = env
       override def resume: StepResult[T] = s.resume.resume.run
       override def continuation: (() => Unit) => Unit = c
-      override def onCommit: () => Unit = comm
-      override def onRollback: () => Unit = roll
+      override def postActions: IndexPostActions = post
     }
   }
 
@@ -287,11 +345,11 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
 
       programRes match {
         case -\/(-\/(-\/(error))) =>
-          rollback(true, step.onRollback)
+          rollback(true, step.postActions)
           sender() ! step.request.failure(error)
 
         case -\/(-\/(\/-((events, result, newState)))) =>
-          commit(events, step.onCommit) { () =>
+          commit(events, step.postActions) { () =>
             state = state.copy(underlying = newState)
             sender() ! step.request.success(result)
           }
@@ -299,9 +357,9 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
         case -\/(\/-(idx)) =>
           val replyTo = sender()
           idx.trans(indexInterpreter).run onComplete {
-            case scala.util.Success(rest) => self.tell(step.nextIndexStep(rest._1, rest._2, rest._3, rest._4), replyTo)
+            case scala.util.Success(rest) => self.tell(step.nextIndexStep(rest._1, rest._2, rest._3), replyTo)
             case scala.util.Failure(err) =>
-              rollback(true, step.onRollback)
+              rollback(true, step.postActions)
               err match {
                 case e: ResponseError => replyTo ! step.request.failure(e)
                 case e                => replyTo ! step.request.failure(InternalError(e))
@@ -314,7 +372,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
           queryFuture(dispatcher) onComplete {
             case scala.util.Success(rest) => self.tell(step.nextQueryStep(rest), replyTo)
             case scala.util.Failure(err) =>
-              rollback(true, step.onRollback)
+              rollback(true, step.postActions)
               err match {
                 case e: ResponseError => replyTo ! step.request.failure(e)
                 case e                => replyTo ! step.request.failure(InternalError(e))
@@ -325,7 +383,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   }
 
   private def interpret[T](r: Request[T], environment: Environment, program: Program[T]): Unit = {
-    interpretStep(NextStep(r, environment, f => f(), () => (), () => (), program.run(environment, state.underlying).run))
+    interpretStep(NextStep(r, environment, f => f(), IndexPostActions.indexPostActionsMonoid.zero, program.run(environment, state.underlying).run))
   }
 
   private def processNextStep: Receive = {
