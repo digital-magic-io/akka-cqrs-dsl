@@ -1,6 +1,6 @@
 {
   "package": {
-    "name": "akka-cqrs-dsl-spray",
+    "name": "akka-cqrs-dsl",
     "repo": "digital-magic",
     "subject": "digital-magic",
     "desc": "Deploy from Travis-CI",
@@ -18,6 +18,10 @@
 
   "files":
   [
+    {"includePattern": "akka-cqrs-dsl-core/target/scala-2.12/(.*\.jar)", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl-core_2.12/2.0.1/$1"},
+    {"includePattern": "akka-cqrs-dsl-core/target/scala-2.12/(.*).pom","uploadPattern": "/io/digital-magic/akka-cqrs-dsl-core_2.12/2.0.1/$1.pom"},
+    {"includePattern": "akka-cqrs-dsl-kryo/target/scala-2.12/(.*\.jar)", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl-kryo_2.12/2.0.1/$1"},
+    {"includePattern": "akka-cqrs-dsl-kryo/target/scala-2.12/(.*).pom","uploadPattern": "/io/digital-magic/akka-cqrs-dsl-kryo_2.12/2.0.1/$1.pom"},
     {"includePattern": "akka-cqrs-dsl-spray/target/scala-2.12/(.*\.jar)", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl-spray_2.12/2.0.1/$1"},
     {"includePattern": "akka-cqrs-dsl-spray/target/scala-2.12/(.*).pom","uploadPattern": "/io/digital-magic/akka-cqrs-dsl-spray_2.12/2.0.1/$1.pom"}
   ],
