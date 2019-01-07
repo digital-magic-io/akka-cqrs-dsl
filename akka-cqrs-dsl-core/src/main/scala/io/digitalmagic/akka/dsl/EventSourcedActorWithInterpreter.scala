@@ -76,8 +76,8 @@ object EventSourcedActorWithInterpreter {
       IndexPostActions(api)(key,
         () => A.lowLevelApi(api).rollbackAcquisition(entityId, key),
         Some(api.AcquisitionAbortedClientEvent(key)),
-        () => A.lowLevelApi(api).commitAcquisition(entityId, key),
-        Some(api.AcquisitionCompletedClientEvent(key))
+        () => A.lowLevelApi(api).rollbackAcquisition(entityId, key),
+        Some(api.AcquisitionAbortedClientEvent(key))
       )
 
     def commitRelease[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: UniqueIndexInterface[I]): IndexPostActions =
@@ -92,8 +92,8 @@ object EventSourcedActorWithInterpreter {
       IndexPostActions(api)(key,
         () => A.lowLevelApi(api).rollbackRelease(entityId, key),
         Some(api.ReleaseAbortedClientEvent(key)),
-        () => A.lowLevelApi(api).commitRelease(entityId, key),
-        Some(api.ReleaseCompletedClientEvent(key))
+        () => A.lowLevelApi(api).rollbackRelease(entityId, key),
+        Some(api.ReleaseAbortedClientEvent(key))
       )
   }
 }
