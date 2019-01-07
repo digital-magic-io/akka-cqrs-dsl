@@ -4,7 +4,7 @@ organizationHomepage := Some(url("http://www.digital-magic.io"))
 startYear            := Some(2016)
 
 val buildSettings = Seq(
-  organization := "io.digitalmagic",
+  organization := "io.digital-magic",
   version      := "2.0.1",  // don't forget to bump version in .*.bintray.json
   parallelExecution in Test := false,
   scalaVersion       := Dependencies.Versions.scala212,
