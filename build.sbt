@@ -3,9 +3,6 @@ import sbt.Keys._
 organizationHomepage := Some(url("http://www.digital-magic.io"))
 startYear            := Some(2016)
 
-resolvers += Resolver.sonatypeRepo("releases")
-resolvers += "dnvriend" at "http://dl.bintray.com/dnvriend/maven"
-
 val buildSettings = Seq(
   organization := "io.digitalmagic",
   version      := "2.0.1",  // don't forget to bump version in .bintray.json
@@ -21,6 +18,10 @@ val buildSettings = Seq(
     "-language:implicitConversions",
     "-language:higherKinds",
     "-Ypartial-unification"
+  ),
+  resolvers ++= Seq(
+    Resolver.sonatypeRepo("releases"),
+    "dnvriend" at "http://dl.bintray.com/dnvriend/maven"
   )
 )
 
