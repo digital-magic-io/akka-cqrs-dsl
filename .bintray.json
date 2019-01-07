@@ -13,13 +13,17 @@
   },
 
   "version": {
-    "name": "2.0"
+    "name": "2.0.1"
   },
 
   "files":
   [
-    {"includePattern": "target/scala-2.12/(.*\.jar)", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl_2.12/2.0/$1"},
-    {"includePattern": "target/scala-2.12/(.*).pom","uploadPattern": "/io/digital-magic/akka-cqrs-dsl_2.12/2.0/$1.pom"}
+    {"includePattern": "akka-cqrs-dsl-core/target/scala-2.12/(.*\.jar)", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl-core_2.12/2.0.1/$1"},
+    {"includePattern": "akka-cqrs-dsl-core/target/scala-2.12/(.*).pom","uploadPattern": "/io/digital-magic/akka-cqrs-dsl-core_2.12/2.0.1/$1.pom"},
+    {"includePattern": "akka-cqrs-dsl-kryo/target/scala-2.12/(.*\.jar)", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl-kryo_2.12/2.0.1/$1"},
+    {"includePattern": "akka-cqrs-dsl-kryo/target/scala-2.12/(.*).pom","uploadPattern": "/io/digital-magic/akka-cqrs-dsl-kryo_2.12/2.0.1/$1.pom"},
+    {"includePattern": "akka-cqrs-dsl-spray/target/scala-2.12/(.*\.jar)", "uploadPattern": "/io/digital-magic/akka-cqrs-dsl-spray.12/2.0.1/$1"},
+    {"includePattern": "akka-cqrs-dsl-spray/target/scala-2.12/(.*).pom","uploadPattern": "/io/digital-magic/akka-cqrs-dsl-spray.12/2.0.1/$1.pom"}
   ],
   "publish": true
 }

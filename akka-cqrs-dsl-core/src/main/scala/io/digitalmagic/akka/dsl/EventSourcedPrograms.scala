@@ -7,8 +7,6 @@ import scalaz._
 import Scalaz._
 
 trait EventSourcedPrograms extends EventSourced {
-  import PersistentStateProcessor.ops._
-
   type EntityIdType
 
   type Events = Vector[EventType]
@@ -69,7 +67,7 @@ trait EventSourcedPrograms extends EventSourced {
   def log(f: LoggingAdapter => Unit): Program[Unit] = logWriterMonad.tell(Vector(f))
 
   def emit(events: EventType*): Program[Unit] = for {
-    _ <- modify(events.foldLeft(_)(_.process(_)))
+    _ <- modify(events.foldLeft(_)(persistentState.process))
     _ <- tell(events.toVector)
   } yield ()
 }

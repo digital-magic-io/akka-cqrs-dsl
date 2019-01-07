@@ -4,7 +4,6 @@ import java.time.Instant
 
 import iotaz._
 import scalaz._
-import simulacrum._
 
 import scala.reflect.ClassTag
 
@@ -17,7 +16,7 @@ trait PersistentState extends Product with Serializable {
   type EventType <: Event
 }
 
-@typeclass trait PersistentStateProcessor[T <: PersistentState] {
+trait PersistentStateProcessor[T <: PersistentState] {
   def empty: T
   def process(state: T, event: T#EventType): T
 }
@@ -29,7 +28,7 @@ trait EventSourced {
 
   type State <: PersistentState { type EventType = EventSourced.this.EventType }
   implicit val stateTag: ClassTag[State]
-  implicit val persistentState: PersistentStateProcessor[State]
+  val persistentState: PersistentStateProcessor[State]
 }
 
 class ApiHelper[F[_], Alg[A] <: CopK[_, A], Program[_]](implicit val I: CopK.Inject[F, Alg], val T: Alg ~> Program) {

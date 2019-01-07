@@ -1,6 +1,6 @@
 package io.digitalmagic.akka.dsl
 
-import akka.actor.{ActorRef, NoSerializationVerificationNeeded, PoisonPill, ReceiveTimeout}
+import akka.actor.{NoSerializationVerificationNeeded, PoisonPill, ReceiveTimeout}
 import akka.cluster.sharding.ShardRegion.Passivate
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotMetadata, SnapshotOffer}
 import io.digitalmagic.akka.dsl.API._
@@ -36,7 +36,6 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   Self: EventSourcedPrograms =>
 
   import EventSourcedActorWithInterpreter._
-  import PersistentStateProcessor.ops._
   import UniqueIndexApi._
   import context.dispatcher
 
@@ -45,7 +44,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   type Logger[T] = WriterT[Identity, Log, T]
   type Result[T] = ResponseError \/ (Events, T, State)
 
-  type Program[A]  = RWST[EitherT[FreeT[Coyoneda[Index#Algebra, ?], FreeT[Coyoneda[QueryAlgebra, ?], Logger, ?], ?], ResponseError, ?], Environment, Events, State, A]
+  type Program[A] = RWST[EitherT[FreeT[Coyoneda[Index#Algebra, ?], FreeT[Coyoneda[QueryAlgebra, ?], Logger, ?], ?], ResponseError, ?], Environment, Events, State, A]
   override lazy val programMonad: Monad[Program] = Monad[Program]
 
   private type QueryStep[T] = FreeT[Coyoneda[QueryAlgebra, ?], Logger, Result[T] \/ Coyoneda[Index#Algebra, IndexStep[T]]]
@@ -144,7 +143,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
       processIndexEvent(event)
 
     case event: EventType =>
-      state = state.copy(underlying = state.underlying.process(event))
+      state = state.copy(underlying = persistentState.process(state.underlying, event))
   }
 
   abstract override def receiveRecoverRecoveryComplete(): Unit = {
