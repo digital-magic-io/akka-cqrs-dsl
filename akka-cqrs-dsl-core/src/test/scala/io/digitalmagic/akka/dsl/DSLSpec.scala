@@ -311,6 +311,29 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
         val optionEntityId = Await.result(resp, 3 seconds)
         optionEntityId shouldBe Some("e2")
       }
+
+      {
+        val resp = index1.entityActor command IndexExample.GenericCommand("e3", List(IndexExample.AcquireAction("key2"), IndexExample.ReleaseAction("key2"), IndexExample.FailAction)) map identity
+        an [InternalError] should be thrownBy Await.result(resp, 3 seconds)
+      }
+
+      Await.result(index1.indexActor query index1Api.GetEntityId("key2") map identity, 3 seconds) shouldBe None
+
+      {
+        val resp = index1.entityActor command IndexExample.GenericCommand("e3", List(IndexExample.AcquireAction("key2"))) map identity
+        Await.result(resp, 3 seconds) shouldBe (())
+      }
+
+      {
+        val resp = index1.entityActor command IndexExample.GenericCommand("e3", List(IndexExample.ReleaseAction("key2"), IndexExample.AcquireAction("key2"), IndexExample.FailAction)) map identity
+        an [InternalError] should be thrownBy Await.result(resp, 3 seconds)
+      }
+
+      {
+        val resp = index1.indexActor query index1Api.GetEntityId("key2") map identity
+        val optionEntityId = Await.result(resp, 3 seconds)
+        optionEntityId shouldBe Some("e3")
+      }
     }
   }
 }

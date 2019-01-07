@@ -21,6 +21,7 @@ object IndexExample {
   sealed trait Action
   case class AcquireAction(key: String) extends Action
   case class ReleaseAction(key: String) extends Action
+  case object FailAction extends Action
 
   case class AcquireCommand(entityId: String, fail: Boolean) extends Command[Unit]
   case class ReleaseCommand(entityId: String) extends Command[Unit]
@@ -79,6 +80,7 @@ trait IndexExample extends EventSourcedPrograms {
     _ <- actions.reverse.foldMapM {
       case AcquireAction(key) => a1.acquire(key)
       case ReleaseAction(key) => a1.release(key)
+      case FailAction => raiseError[Unit](API.InternalError(new RuntimeException))
     }
   } yield ()
 
