@@ -1,5 +1,8 @@
 # akka-cqrs-dsl
 [![Build Status](https://travis-ci.org/digital-magic-io/akka-cqrs-dsl.svg?branch=master)](https://travis-ci.org/digital-magic-io/akka-cqrs-dsl)
+[![Download](https://api.bintray.com/packages/digital-magic/digital-magic/akka-cqrs-dsl/images/download.svg) ](https://bintray.com/digital-magic/digital-magic/akka-cqrs-dsl/_latestVersion)
+[![License](http://img.shields.io/:license-Apache%202-red.svg)](http://www.apache.org/licenses/LICENSE-2.0.txt)
+
 A convenient DSL for Command/Query Actor communication.
 
 # Simple usage of command/query capability
