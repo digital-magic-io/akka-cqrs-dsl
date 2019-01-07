@@ -6,11 +6,25 @@ scala:
 script:
 - sbt ++$TRAVIS_SCALA_VERSION test packageBin packageDoc packageSrc packagedArtifacts
 deploy:
-  provider: bintray
-  file: ".bintray.json"
-  user: LoneEngineer
-  key:
-    secure: TijVsMUXqEH+6VfrobKsQPSv3B5DzsHxE2iQ6GJzaIisKjSx66XMnX9bXxZlrs+WGQT5hGQFb7tBqhFr7trFHhFdVJaOK1BJ/eq9wcnte29TM8whNCcR54OVLvpw6uu2BeIGLvkM7Ee7iFKLpYNMf0xwOuwdvLK+DTBTHz5J+WAXQBllRIg0xn5BKZ8sYV0p4AcsMKHlD3348QYPHTqdgcAaVa7W9pHAdnpbHNcBAzwlf0zoJqU6zdeU2H7t4091tMCQURK1guldjTPjMxWcBgNIlOjoKhE9lGrFRvAJn9W/vQmaXVbyUmZEjLVtYgl6ekm1JeRUGBZ79j1vp5KjBac2/YmcS8yg+zfqzVxf2KDKg/T7aUUsDtLD4OhM4AlWHvJGVyJmC9cmNg0/GIPZusdhEN/5zARCYZ97caCtY+6ZfRivCIJkUa9NqxA+zVLtFXE/ao5eodeKMJnQph2xaE3obMweqt667NtmWnvwV4XVxD+R+08GQzlcD1QbgGkQV/bJ5mcvFuD680umY0F+zxDmVY5pAjQvDmAeQdiEEz/1wajC3SnZO5sHeinoIG0zf8J4TYtA81FJw2YaPWOXNnkIplk8isal/77ivrKpKIr/j5t2vXcqeZj0S1VkIkXPZlkk6SEoN/rKrOBW5GUgZi6s8Xmbhu7UgbIq7gG6WUQ=
-  on: master
-  skip_cleanup: true
+  - provider: bintray
+    file: ".core.bintray.json"
+    user: LoneEngineer
+    key:
+      secure: TijVsMUXqEH+6VfrobKsQPSv3B5DzsHxE2iQ6GJzaIisKjSx66XMnX9bXxZlrs+WGQT5hGQFb7tBqhFr7trFHhFdVJaOK1BJ/eq9wcnte29TM8whNCcR54OVLvpw6uu2BeIGLvkM7Ee7iFKLpYNMf0xwOuwdvLK+DTBTHz5J+WAXQBllRIg0xn5BKZ8sYV0p4AcsMKHlD3348QYPHTqdgcAaVa7W9pHAdnpbHNcBAzwlf0zoJqU6zdeU2H7t4091tMCQURK1guldjTPjMxWcBgNIlOjoKhE9lGrFRvAJn9W/vQmaXVbyUmZEjLVtYgl6ekm1JeRUGBZ79j1vp5KjBac2/YmcS8yg+zfqzVxf2KDKg/T7aUUsDtLD4OhM4AlWHvJGVyJmC9cmNg0/GIPZusdhEN/5zARCYZ97caCtY+6ZfRivCIJkUa9NqxA+zVLtFXE/ao5eodeKMJnQph2xaE3obMweqt667NtmWnvwV4XVxD+R+08GQzlcD1QbgGkQV/bJ5mcvFuD680umY0F+zxDmVY5pAjQvDmAeQdiEEz/1wajC3SnZO5sHeinoIG0zf8J4TYtA81FJw2YaPWOXNnkIplk8isal/77ivrKpKIr/j5t2vXcqeZj0S1VkIkXPZlkk6SEoN/rKrOBW5GUgZi6s8Xmbhu7UgbIq7gG6WUQ=
+    on: master
+    skip_cleanup: true
+  - provider: bintray
+    file: ".kryo.bintray.json"
+    user: LoneEngineer
+    key:
+      secure: TijVsMUXqEH+6VfrobKsQPSv3B5DzsHxE2iQ6GJzaIisKjSx66XMnX9bXxZlrs+WGQT5hGQFb7tBqhFr7trFHhFdVJaOK1BJ/eq9wcnte29TM8whNCcR54OVLvpw6uu2BeIGLvkM7Ee7iFKLpYNMf0xwOuwdvLK+DTBTHz5J+WAXQBllRIg0xn5BKZ8sYV0p4AcsMKHlD3348QYPHTqdgcAaVa7W9pHAdnpbHNcBAzwlf0zoJqU6zdeU2H7t4091tMCQURK1guldjTPjMxWcBgNIlOjoKhE9lGrFRvAJn9W/vQmaXVbyUmZEjLVtYgl6ekm1JeRUGBZ79j1vp5KjBac2/YmcS8yg+zfqzVxf2KDKg/T7aUUsDtLD4OhM4AlWHvJGVyJmC9cmNg0/GIPZusdhEN/5zARCYZ97caCtY+6ZfRivCIJkUa9NqxA+zVLtFXE/ao5eodeKMJnQph2xaE3obMweqt667NtmWnvwV4XVxD+R+08GQzlcD1QbgGkQV/bJ5mcvFuD680umY0F+zxDmVY5pAjQvDmAeQdiEEz/1wajC3SnZO5sHeinoIG0zf8J4TYtA81FJw2YaPWOXNnkIplk8isal/77ivrKpKIr/j5t2vXcqeZj0S1VkIkXPZlkk6SEoN/rKrOBW5GUgZi6s8Xmbhu7UgbIq7gG6WUQ=
+    on: master
+    skip_cleanup: true
+  - provider: bintray
+    file: ".spray.bintray.json"
+    user: LoneEngineer
+    key:
+      secure: TijVsMUXqEH+6VfrobKsQPSv3B5DzsHxE2iQ6GJzaIisKjSx66XMnX9bXxZlrs+WGQT5hGQFb7tBqhFr7trFHhFdVJaOK1BJ/eq9wcnte29TM8whNCcR54OVLvpw6uu2BeIGLvkM7Ee7iFKLpYNMf0xwOuwdvLK+DTBTHz5J+WAXQBllRIg0xn5BKZ8sYV0p4AcsMKHlD3348QYPHTqdgcAaVa7W9pHAdnpbHNcBAzwlf0zoJqU6zdeU2H7t4091tMCQURK1guldjTPjMxWcBgNIlOjoKhE9lGrFRvAJn9W/vQmaXVbyUmZEjLVtYgl6ekm1JeRUGBZ79j1vp5KjBac2/YmcS8yg+zfqzVxf2KDKg/T7aUUsDtLD4OhM4AlWHvJGVyJmC9cmNg0/GIPZusdhEN/5zARCYZ97caCtY+6ZfRivCIJkUa9NqxA+zVLtFXE/ao5eodeKMJnQph2xaE3obMweqt667NtmWnvwV4XVxD+R+08GQzlcD1QbgGkQV/bJ5mcvFuD680umY0F+zxDmVY5pAjQvDmAeQdiEEz/1wajC3SnZO5sHeinoIG0zf8J4TYtA81FJw2YaPWOXNnkIplk8isal/77ivrKpKIr/j5t2vXcqeZj0S1VkIkXPZlkk6SEoN/rKrOBW5GUgZi6s8Xmbhu7UgbIq7gG6WUQ=
+    on: master
+    skip_cleanup: true
 
