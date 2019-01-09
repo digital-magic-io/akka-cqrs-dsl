@@ -22,32 +22,32 @@ trait IsomorphismStringRepresentable[F, G] extends StringRepresentable[F] {
 object StringRepresentable {
   @inline def apply[F](implicit F: StringRepresentable[F]): StringRepresentable[F] = F
 
-  implicit def stringStringRepresentable: StringRepresentable[String] = new StringRepresentable[String] {
+  implicit val stringStringRepresentable: StringRepresentable[String] = new StringRepresentable[String] {
     override def asString(v: String): String = v
     override def fromString(s: String): Option[String] = Some(s)
   }
 
-  implicit def byteStringRepresentable: StringRepresentable[Byte] = new StringRepresentable[Byte] {
+  implicit val byteStringRepresentable: StringRepresentable[Byte] = new StringRepresentable[Byte] {
     override def asString(v: Byte): String = v.toString
     override def fromString(s: String): Option[Byte] = catching(classOf[NumberFormatException]) opt s.toByte
   }
 
-  implicit def shortStringRepresentable: StringRepresentable[Short] = new StringRepresentable[Short] {
+  implicit val shortStringRepresentable: StringRepresentable[Short] = new StringRepresentable[Short] {
     override def asString(v: Short): String = v.toString
     override def fromString(s: String): Option[Short] = catching(classOf[NumberFormatException]) opt s.toShort
   }
 
-  implicit def intStringRepresentable: StringRepresentable[Int] = new StringRepresentable[Int] {
+  implicit val intStringRepresentable: StringRepresentable[Int] = new StringRepresentable[Int] {
     override def asString(v: Int): String = v.toString
     override def fromString(s: String): Option[Int] = catching(classOf[NumberFormatException]) opt s.toInt
   }
 
-  implicit def longStringRepresentable: StringRepresentable[Long] = new StringRepresentable[Long] {
+  implicit val longStringRepresentable: StringRepresentable[Long] = new StringRepresentable[Long] {
     override def asString(v: Long): String = v.toString
     override def fromString(s: String): Option[Long] = catching(classOf[NumberFormatException]) opt s.toLong
   }
 
-  implicit def uuidStringRepresentable: StringRepresentable[UUID] = new StringRepresentable[UUID] {
+  implicit val uuidStringRepresentable: StringRepresentable[UUID] = new StringRepresentable[UUID] {
     override def asString(v: UUID): String = v.toString
     override def fromString(s: String): Option[UUID] = catching(classOf[IllegalArgumentException]) opt UUID.fromString(s)
   }
@@ -58,7 +58,7 @@ object StringRepresentable {
       override def iso: F <=> G = D
     }
 
-  implicit def stringRepresentableInvariantFunctor: InvariantFunctor[StringRepresentable] = new InvariantFunctor[StringRepresentable] {
+  implicit val stringRepresentableInvariantFunctor: InvariantFunctor[StringRepresentable] = new InvariantFunctor[StringRepresentable] {
     override def xmap[A, B](ma: StringRepresentable[A], f: A => B, g: B => A): StringRepresentable[B] = new StringRepresentable[B] {
       override def asString(v: B): String = ma.asString(g(v))
       override def fromString(s: String): Option[B] = ma.fromString(s).map(f)
