@@ -61,6 +61,7 @@ object EventSourcedActorWithInterpreter {
   }
   object IndexPostActions {
     implicit val indexPostActionsMonoid: Monoid[IndexPostActions] = Monoid[IndexPostActionsMap].xmap(map => IndexPostActions(map), _.actions)
+    def empty: IndexPostActions = indexPostActionsMonoid.zero
     def apply[I <: UniqueIndexApi](api: I)(key: api.KeyType, commit: () => Unit, commitEvent: Option[api.ClientEventType], rollback: () => Unit, rollbackEvent: Option[api.ClientEventType]): IndexPostActions =
       IndexPostActions(Map(IndexPostActionKey(api)(key) -> LastVal(IndexPostAction(commit, commitEvent, rollback, rollbackEvent))))
 
@@ -214,7 +215,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
 
   abstract override def receiveRecoverRecoveryComplete(): Unit = {
     super.receiveRecoverRecoveryComplete()
-    rollback(false, IndexPostActions.indexPostActionsMonoid.zero)
+    rollback(false, IndexPostActions.empty)
   }
 
   override protected def onPersistRejected(cause: Throwable, event: Any, seqNr: Long): Unit = {
@@ -280,12 +281,12 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
           case Some(api.ReleasePendingClientState()) => // release has been started, so roll it back
             Future.successful((f => f(), IndexPostActions.rollbackRelease(api)(entityId, key), ()))
           case Some(api.AcquiredClientState()) => // already acquired
-            Future.successful((f => f(), IndexPostActions.indexPostActionsMonoid.zero, ()))
+            Future.successful((f => f(), IndexPostActions.empty, ()))
         }
       case api.Release(key) =>
         state.indexesState.get(api).flatMap(_.get(key)) match {
           case None => // not yet acquired
-            Future.successful((f => f(), IndexPostActions.indexPostActionsMonoid.zero, ()))
+            Future.successful((f => f(), IndexPostActions.empty, ()))
           case Some(api.AcquisitionPendingClientState()) => // acquisition has been started, so roll it back
             Future.successful((f => f(), IndexPostActions.rollbackAcquisition(api)(entityId, key), ()))
           case Some(api.ReleasePendingClientState()) => // release has been started
@@ -383,7 +384,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   }
 
   private def interpret[T](r: Request[T], environment: Environment, program: Program[T]): Unit = {
-    interpretStep(NextStep(r, environment, f => f(), IndexPostActions.indexPostActionsMonoid.zero, program.run(environment, state.underlying).run))
+    interpretStep(NextStep(r, environment, f => f(), IndexPostActions.empty, program.run(environment, state.underlying).run))
   }
 
   private def processNextStep: Receive = {
