@@ -1,5 +1,7 @@
 package io.digitalmagic.akka.dsl
 
+import scalaz.InvariantFunctor
+
 trait StringRepresentable[T] {
   def asString(v: T): String
   def fromString(s: String): Option[T]
@@ -17,6 +19,13 @@ object StringRepresentable {
       Some(s.toInt)
     } catch {
       case _: NumberFormatException => None
+    }
+  }
+
+  implicit def stringRepresentableInvariantFunctor: InvariantFunctor[StringRepresentable] = new InvariantFunctor[StringRepresentable] {
+    override def xmap[A, B](ma: StringRepresentable[A], f: A => B, g: B => A): StringRepresentable[B] = new StringRepresentable[B] {
+      override def asString(v: B): String = ma.asString(g(v))
+      override def fromString(s: String): Option[B] = ma.fromString(s).map(f)
     }
   }
 }
