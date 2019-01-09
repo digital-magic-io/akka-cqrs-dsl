@@ -8,6 +8,8 @@ trait StringRepresentable[T] {
 }
 
 object StringRepresentable {
+  @inline def apply[F](implicit F: StringRepresentable[F]): StringRepresentable[F] = F
+
   implicit def stringStringRepresentable: StringRepresentable[String] = new StringRepresentable[String] {
     override def asString(v: String): String = v
     override def fromString(s: String): Option[String] = Some(s)
