@@ -60,7 +60,7 @@ object EventSourcedActorWithInterpreter {
     def rollbackEvents: Vector[UniqueIndexApi#ClientEventType] = actions.values.flatMap(LastVal.unwrap(_).rollbackEvent).toVector
   }
   object IndexPostActions {
-    implicit val indexPostActionsMonoid: Monoid[IndexPostActions] = Monoid.fromIso(Isomorphism.IsoSet[IndexPostActions, IndexPostActionsMap](_.actions, map => IndexPostActions(map)))
+    implicit val indexPostActionsMonoid: Monoid[IndexPostActions] = Monoid[IndexPostActionsMap].xmap(map => IndexPostActions(map), _.actions)
     def apply[I <: UniqueIndexApi](api: I)(key: api.KeyType, commit: () => Unit, commitEvent: Option[api.ClientEventType], rollback: () => Unit, rollbackEvent: Option[api.ClientEventType]): IndexPostActions =
       IndexPostActions(Map(IndexPostActionKey(api)(key) -> LastVal(IndexPostAction(commit, commitEvent, rollback, rollbackEvent))))
 

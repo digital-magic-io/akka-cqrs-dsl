@@ -6,8 +6,7 @@ import TListK.:::
 
 import scala.annotation.implicitNotFound
 
-sealed trait IsQueryHelper[LL <: TListK] {
-}
+sealed trait IsQueryHelper[LL <: TListK]
 
 object IsQueryHelper {
   private val isQueryHelperSingleton = new IsQueryHelper[TNilK] {}
