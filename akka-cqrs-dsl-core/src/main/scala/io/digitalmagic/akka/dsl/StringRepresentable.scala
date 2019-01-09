@@ -54,7 +54,7 @@ object StringRepresentable {
 
   def fromIso[F, G](D: F <=> G)(implicit S: StringRepresentable[G]): StringRepresentable[F] =
     new IsomorphismStringRepresentable[F, G] {
-      override implicit def G: StringRepresentable[G] = S
+      override def G: StringRepresentable[G] = S
       override def iso: F <=> G = D
     }
 

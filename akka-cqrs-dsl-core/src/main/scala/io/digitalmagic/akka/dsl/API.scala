@@ -46,23 +46,23 @@ object API {
     override def failure(error: ResponseError): QueryResult[T] = QueryResult(Left(error))
   }
 
-  case class RequestFuture[T](f: ExecutionContext => Future[T]) extends Function[ExecutionContext, Future[T]] {
+  case class RequestFuture[T](f: ExecutionContext => Future[T]) extends AnyRef with Function[ExecutionContext, Future[T]] {
     override def apply(ec: ExecutionContext): Future[T] = f(ec)
   }
 
   object RequestFuture {
-    implicit def requestFutureFunctor: Functor[RequestFuture] = new Functor[RequestFuture] {
+    implicit val requestFutureFunctor: Functor[RequestFuture] = new Functor[RequestFuture] {
       override def map[A, B](fa: RequestFuture[A])(f: A => B): RequestFuture[B] = RequestFuture(implicit ec => fa(ec).map(f))
     }
   }
 
-  implicit class PimpedActorRef(val actorRef: ActorRef) {
+  implicit class PimpedActorRef(val actorRef: ActorRef) extends AnyRef {
     def query[T](msg: Query[T])(implicit tag: ClassTag[T], akkaTimeout: Timeout = 5 seconds): QueryProcessor[T] = QueryProcessor[T](Left(actorRef), msg)
 
     def command[T](msg: Command[T])(implicit tag: ClassTag[T], akkaTimeout: Timeout = 5 seconds): CommandProcessor[T] = CommandProcessor[T](Left(actorRef), msg)
   }
 
-  implicit class PimpedActorSelection(val actorSelection: ActorSelection) {
+  implicit class PimpedActorSelection(val actorSelection: ActorSelection) extends AnyRef {
     def query[T](msg: Query[T])(implicit tag: ClassTag[T], akkaTimeout: Timeout = 5 seconds): QueryProcessor[T] = QueryProcessor[T](Right(actorSelection), msg)
 
     def command[T](msg: Command[T])(implicit tag: ClassTag[T], akkaTimeout: Timeout = 5 seconds): CommandProcessor[T] = CommandProcessor[T](Right(actorSelection), msg)
