@@ -1,10 +1,18 @@
 package io.digitalmagic.akka.dsl
 
 import scalaz.InvariantFunctor
+import scalaz.Isomorphism._
 
 trait StringRepresentable[T] {
   def asString(v: T): String
   def fromString(s: String): Option[T]
+}
+
+trait IsomorphismStringRepresentable[F, G] extends StringRepresentable[F] {
+  implicit def G: StringRepresentable[G]
+  def iso: F <=> G
+  override def asString(v: F): String = G.asString(iso.to(v))
+  override def fromString(s: String): Option[F] = G.fromString(s).map(iso.from(_))
 }
 
 object StringRepresentable {
@@ -23,6 +31,12 @@ object StringRepresentable {
       case _: NumberFormatException => None
     }
   }
+
+  def fromIso[F, G](D: F <=> G)(implicit S: StringRepresentable[G]): StringRepresentable[F] =
+    new IsomorphismStringRepresentable[F, G] {
+      override implicit def G: StringRepresentable[G] = S
+      override def iso: F <=> G = D
+    }
 
   implicit def stringRepresentableInvariantFunctor: InvariantFunctor[StringRepresentable] = new InvariantFunctor[StringRepresentable] {
     override def xmap[A, B](ma: StringRepresentable[A], f: A => B, g: B => A): StringRepresentable[B] = new StringRepresentable[B] {
