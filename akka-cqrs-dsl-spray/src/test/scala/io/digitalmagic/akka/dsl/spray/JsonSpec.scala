@@ -26,7 +26,7 @@ object JsonSpec {
       val fields = json.asJsObject.fields
       fields("type").convertTo[String] match {
         case "MyState" => fields("key").convertTo[MyState]
-        case other     => deserializationError(s"unknown stat type $other")
+        case other     => deserializationError(s"unknown state type $other")
       }
     }
     override def write(obj: PersistentState): JsValue = {
