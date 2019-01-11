@@ -5,7 +5,7 @@ startYear            := Some(2016)
 
 val buildSettings = Seq(
   organization := "io.digital-magic",
-  version      := "2.0.2",  // don't forget to bump version in .bintray.json
+  version      := "2.0.3",  // don't forget to bump version in .bintray.json
   parallelExecution in Test := false,
   scalaVersion       := Dependencies.Versions.scala212,
   crossScalaVersions := Seq(Dependencies.Versions.scala212),
