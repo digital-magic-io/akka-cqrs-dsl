@@ -24,7 +24,7 @@ object Adder {
     }
   }
 
-  def props(implicit api1: Actor1.Query ~> RequestFuture, api2: Actor2.Query ~> RequestFuture): Props = Props(new Adder())
+  def props(implicit api1: Actor1.Query ~> LazyFuture, api2: Actor2.Query ~> LazyFuture): Props = Props(new Adder())
 
   case object QueryAndAdd extends Command[Int]
 }
@@ -72,11 +72,11 @@ trait AdderPrograms extends EventSourcedPrograms {
   }
 }
 
-class Adder()(implicit val api1: Actor1.Query ~> RequestFuture, val api2: Actor2.Query ~> RequestFuture) extends AdderPrograms with EventSourcedActorWithInterpreter {
+class Adder()(implicit val api1: Actor1.Query ~> LazyFuture, val api2: Actor2.Query ~> LazyFuture) extends AdderPrograms with EventSourcedActorWithInterpreter {
   override def entityId: Unit = ()
   override val persistenceId: String = s"${context.system.name}.MyExampleActor"
 
-  override def interpreter: QueryAlgebra ~> RequestFuture = CopK.NaturalTransformation.summon[QueryAlgebra, RequestFuture]
+  override def interpreter: QueryAlgebra ~> LazyFuture = CopK.NaturalTransformation.summon[QueryAlgebra, LazyFuture]
   override def indexInterpreter: Index#Algebra ~> IndexFuture = CopK.NaturalTransformation.summon[Index#Algebra, IndexFuture]
   override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, ?] = CopK.NaturalTransformation.summon[Index#ClientAlgebra, Const[Unit, ?]]
   override def clientEventInterpreter: ClientEventInterpreter = implicitly

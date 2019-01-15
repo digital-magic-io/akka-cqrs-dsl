@@ -142,10 +142,10 @@ trait UniqueIndexApi {
   }
 
   trait LowLevelApi {
-    def startAcquisition(entityId: EntityIdType, key: KeyType): RequestFuture[Unit]
+    def startAcquisition(entityId: EntityIdType, key: KeyType): LazyFuture[Unit]
     def commitAcquisition(entityId: EntityIdType, key: KeyType): Unit
     def rollbackAcquisition(entityId: EntityIdType, key: KeyType): Unit
-    def startRelease(entityId: EntityIdType, key: KeyType): RequestFuture[Unit]
+    def startRelease(entityId: EntityIdType, key: KeyType): LazyFuture[Unit]
     def commitRelease(entityId: EntityIdType, key: KeyType): Unit
     def rollbackRelease(entityId: EntityIdType, key: KeyType): Unit
   }
@@ -204,20 +204,20 @@ trait UniqueIndexApi {
 }
 
 trait UniqueIndexInterface[I <: UniqueIndexApi] {
-  def clientApiInterpreter(api: I): api.ClientQuery ~> RequestFuture
+  def clientApiInterpreter(api: I): api.ClientQuery ~> LazyFuture
   def lowLevelApi(api: I): api.LowLevelApi
 }
 
 case class ActorBasedUniqueIndex[I <: UniqueIndexApi](entityActor: ActorSelection, indexActor: ActorSelection) extends UniqueIndexInterface[I] {
-  override def clientApiInterpreter(api: I): api.ClientQuery ~> RequestFuture = Lambda[api.ClientQuery ~> RequestFuture] {
+  override def clientApiInterpreter(api: I): api.ClientQuery ~> LazyFuture = Lambda[api.ClientQuery ~> LazyFuture] {
     case q: api.IsIndexNeeded => entityActor query q
   }
 
   override def lowLevelApi(api: I): api.LowLevelApi = new api.LowLevelApi {
-    override def startAcquisition(entityId: api.EntityIdType, key: api.KeyType): RequestFuture[Unit] = indexActor.command(api.StartAcquisition(entityId, key))
+    override def startAcquisition(entityId: api.EntityIdType, key: api.KeyType): LazyFuture[Unit] = indexActor.command(api.StartAcquisition(entityId, key))
     override def commitAcquisition(entityId: api.EntityIdType, key: api.KeyType): Unit = indexActor.tell(api.CommitAcquisition(entityId, key), ActorRef.noSender)
     override def rollbackAcquisition(entityId: api.EntityIdType, key: api.KeyType): Unit = indexActor.tell(api.RollbackAcquisition(entityId, key), ActorRef.noSender)
-    override def startRelease(entityId: api.EntityIdType, key: api.KeyType): RequestFuture[Unit] = indexActor.command(api.StartRelease(entityId, key))
+    override def startRelease(entityId: api.EntityIdType, key: api.KeyType): LazyFuture[Unit] = indexActor.command(api.StartRelease(entityId, key))
     override def commitRelease(entityId: api.EntityIdType, key: api.KeyType): Unit = indexActor.tell(api.CommitRelease(entityId, key), ActorRef.noSender)
     override def rollbackRelease(entityId: api.EntityIdType, key: api.KeyType): Unit = indexActor.tell(api.RollbackRelease(entityId, key), ActorRef.noSender)
   }

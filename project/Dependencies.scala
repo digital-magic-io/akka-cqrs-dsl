@@ -13,6 +13,8 @@ object Dependencies {
     val akka                    = "2.5.19"
     val scalaTest               = "3.0.5"
     val akkaPersistenceInMemory = "2.5.15.1"
+    val specs2Version           = "4.3.6"
+    val scalacheckVersion       = "1.14.0"
   }
 
   def scalaReflect(v: String): Seq[ModuleID] = Seq("org.scala-lang" % "scala-reflect" % v)
@@ -29,7 +31,11 @@ object Dependencies {
     "com.typesafe.akka"          %% "akka-persistence"          % Versions.akka,
     "com.typesafe.akka"          %% "akka-cluster-sharding"     % Versions.akka,
     "com.typesafe.akka"          %% "akka-testkit"              % Versions.akka      % Test,
-    "com.github.dnvriend"        %% "akka-persistence-inmemory" % Versions.akkaPersistenceInMemory % Test
+    "com.github.dnvriend"        %% "akka-persistence-inmemory" % Versions.akkaPersistenceInMemory % Test,
+    "org.specs2"                 %% "specs2-core"               % Versions.specs2Version % Test,
+    "org.specs2"                 %% "specs2-scalacheck"         % Versions.specs2Version % Test,
+    "org.scalacheck"             %% "scalacheck"                % Versions.scalacheckVersion % Test,
+    "org.scalaz"                 %% "scalaz-scalacheck-binding" % (Versions.scalaz + "-scalacheck-1.14") % Test,
   ) ++ scalaVersion(sv => Dependencies.scalaReflect(sv)).value
 
   val kryoDependencies = libraryDependencies ++= commonDependencies ++ Seq(

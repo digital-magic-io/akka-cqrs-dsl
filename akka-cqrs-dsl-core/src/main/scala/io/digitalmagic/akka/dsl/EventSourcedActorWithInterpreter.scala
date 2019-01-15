@@ -133,7 +133,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   implicit val indexFutureFunctor: Functor[IndexFuture] = Functor[Future] compose Functor[IndexResult]
 
   def entityId: EntityIdType
-  def interpreter: QueryAlgebra ~> RequestFuture
+  def interpreter: QueryAlgebra ~> LazyFuture
   def indexInterpreter: Index#Algebra ~> IndexFuture
   def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, ?]
 

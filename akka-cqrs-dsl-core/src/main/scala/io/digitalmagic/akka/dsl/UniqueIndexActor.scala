@@ -194,7 +194,7 @@ case class UniqueIndexActor[I <: UniqueIndexApi](indexApi: I, name: String, enti
   context.setReceiveTimeout(passivateIn)
 
   override type QueryAlgebra[T] = CopK[ClientQuery ::: TNilK, T]
-  override def interpreter: QueryAlgebra ~> RequestFuture = CopK.NaturalTransformation.of[QueryAlgebra, RequestFuture](I.clientApiInterpreter(indexApi))
+  override def interpreter: QueryAlgebra ~> LazyFuture = CopK.NaturalTransformation.of[QueryAlgebra, LazyFuture](I.clientApiInterpreter(indexApi))
   override def indexInterpreter: Index#Algebra ~> IndexFuture = CopK.NaturalTransformation.summon[Index#Algebra, IndexFuture]
   override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, ?] = CopK.NaturalTransformation.summon[Index#ClientAlgebra, Const[Unit, ?]]
   override def clientEventInterpreter: ClientEventInterpreter = implicitly

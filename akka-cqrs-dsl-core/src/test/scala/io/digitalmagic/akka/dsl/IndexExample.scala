@@ -119,7 +119,7 @@ case class IndexExampleActor(entityId: String)(implicit I1: UniqueIndexInterface
 
   context.setReceiveTimeout(1 seconds)
 
-  override def interpreter: QueryAlgebra ~> RequestFuture = CopK.NaturalTransformation.summon[QueryAlgebra, RequestFuture]
+  override def interpreter: QueryAlgebra ~> LazyFuture = CopK.NaturalTransformation.summon[QueryAlgebra, LazyFuture]
   override def indexInterpreter: Index#Algebra ~> IndexFuture = CopK.NaturalTransformation.summon[Index#Algebra, IndexFuture]
   override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, ?] = CopK.NaturalTransformation.summon[Index#ClientAlgebra, Const[Unit, ?]]
   override def clientEventInterpreter: ClientEventInterpreter = implicitly
