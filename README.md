@@ -99,7 +99,7 @@ class Actor1 extends Actor1Programs with EventSourcedActorWithInterpreter {
   override def persistenceId: String = s"${context.system.name}.Actor1"
 
   // some boiler plate for querying other components and using indexes
-  override def interpreter: QueryAlgebra ~> RequestFuture = CopK.NaturalTransformation.summon[QueryAlgebra, RequestFuture]
+  override def interpreter: QueryAlgebra ~> LazyFuture = CopK.NaturalTransformation.summon[QueryAlgebra, LazyFuture]
   override def indexInterpreter: Index#Algebra ~> IndexFuture = CopK.NaturalTransformation.summon[Index#Algebra, IndexFuture]
   override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, ?] = CopK.NaturalTransformation.summon[Index#ClientAlgebra, Const[Unit, ?]]
   override def clientEventInterpreter: ClientEventInterpreter = implicitly
@@ -126,7 +126,7 @@ object Actor1 {
   }
 
   // interpreter of query algebra for example in terms of an actor
-  def interpreter(actorSelection: ActorSelection): Query ~> RequestFuture = Lambda[Query ~> RequestFuture] {
+  def interpreter(actorSelection: ActorSelection): Query ~> LazyFuture = Lambda[Query ~> LazyFuture] {
     case q: GetValue.type => actorSelection query q
   }
 }
@@ -158,9 +158,9 @@ When implementing an actor to interpret your programs you need:
 
 ```scala
 // to accept interpreters for concrete query algebras
-class Adder()(implicit val api1: Actor1.Query ~> RequestFuture, val api2: Actor2.Query ~> RequestFuture) extends AdderPrograms with EventSourcedActorWithInterpreter {
+class Adder()(implicit val api1: Actor1.Query ~> LazyFuture, val api2: Actor2.Query ~> LazyFuture) extends AdderPrograms with EventSourcedActorWithInterpreter {
   // and to construct interpreter for co-product of those algebras 
-  override def interpreter: QueryAlgebra ~> RequestFuture = CopK.NaturalTransformation.summon[QueryAlgebra, RequestFuture]
+  override def interpreter: QueryAlgebra ~> LazyFuture = CopK.NaturalTransformation.summon[QueryAlgebra, LazyFuture]
 }
 ```
 
