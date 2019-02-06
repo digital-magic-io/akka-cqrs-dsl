@@ -30,7 +30,7 @@ trait DummyActor extends PersistentActor {
 
 object EventSourcedActorWithInterpreter {
   case class EventSourcedActorState[+State <: PersistentState](underlying: State, indexesState: ClientIndexesStateMap = ClientIndexesStateMap())
-  case object Stop
+  case object Stop extends NoSerializationVerificationNeeded
 
   trait IndexPostActionKey {
     type I <: UniqueIndexApi

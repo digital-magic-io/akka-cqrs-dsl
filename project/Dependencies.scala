@@ -15,6 +15,7 @@ object Dependencies {
     val akkaPersistenceInMemory = "2.5.15.1"
     val specs2Version           = "4.3.6"
     val scalacheckVersion       = "1.14.0"
+    val akkaKryoSerialization   = "0.5.2"
   }
 
   def scalaReflect(v: String): Seq[ModuleID] = Seq("org.scala-lang" % "scala-reflect" % v)
@@ -39,7 +40,8 @@ object Dependencies {
   ) ++ scalaVersion(sv => Dependencies.scalaReflect(sv)).value
 
   val kryoDependencies = libraryDependencies ++= commonDependencies ++ Seq(
-    "com.esotericsoftware"       %  "kryo"                       % Versions.kryoVersion
+    "com.esotericsoftware"       %  "kryo"                       % Versions.kryoVersion,
+    "com.github.romix.akka"      %% "akka-kryo-serialization"    % Versions.akkaKryoSerialization % Test
   )
 
   val sprayDependencies = libraryDependencies ++= commonDependencies ++ Seq(

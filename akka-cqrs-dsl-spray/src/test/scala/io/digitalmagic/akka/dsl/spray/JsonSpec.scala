@@ -46,6 +46,7 @@ class JsonSpec extends WordSpecLike with Matchers {
   import Json._
   import JsonSpec._
 
+  implicit val mirror = scala.reflect.runtime.currentMirror
   "spray-json for ClientEvent" must {
     "support serializing AcquisitionStartedClientEvent" in {
       {

@@ -6,13 +6,15 @@ import com.esotericsoftware.kryo.io.{Input, Output}
 import com.esotericsoftware.kryo.{Kryo, KryoException, Serializer}
 import io.digitalmagic.akka.dsl.{ClientIndexesStateMap, UniqueIndexApi}
 
-class ApiSerializer extends Serializer[UniqueIndexApi] {
+import scala.reflect.runtime.universe.Mirror
+
+class ApiSerializer(mirror: Mirror) extends Serializer[UniqueIndexApi] {
   override def write(kryo: Kryo, output: Output, obj: UniqueIndexApi): Unit = {
-    output.writeString(UniqueIndexApi.getApiIdFor(obj))
+    output.writeString(UniqueIndexApi.getApiIdFor(obj)(mirror))
   }
 
   override def read(kryo: Kryo, input: Input, `type`: Class[UniqueIndexApi]): UniqueIndexApi = {
-    UniqueIndexApi.getApiById(input.readString())
+    UniqueIndexApi.getApiById(input.readString())(mirror)
   }
 }
 
@@ -21,7 +23,7 @@ trait Helper {
   def readKey(kryo: Kryo, input: Input, api: UniqueIndexApi): api.KeyType = kryo.readClassAndObject(input).asInstanceOf[api.KeyType]
 }
 
-class ClientEventSerializer extends Serializer[UniqueIndexApi#ClientEvent] with Helper {
+class ClientEventSerializer(apiSerializer: ApiSerializer) extends Serializer[UniqueIndexApi#ClientEvent] with Helper {
   val AcquisitionStartedClientEventName = "AcquisitionStartedClientEvent"
   val AcquisitionCompletedClientEventName = "AcquisitionCompletedClientEvent"
   val AcquisitionAbortedClientEventName = "AcquisitionAbortedClientEvent"
@@ -32,7 +34,7 @@ class ClientEventSerializer extends Serializer[UniqueIndexApi#ClientEvent] with 
   override def write(kryo: Kryo, output: Output, obj: UniqueIndexApi#ClientEvent): Unit = {
     import obj.Api._
 
-    kryo.writeObject(output, obj.Api)
+    kryo.writeObject(output, obj.Api, apiSerializer)
     obj.reflect match {
       case e: AcquisitionStartedClientEvent =>
         output.writeString(AcquisitionStartedClientEventName)
@@ -57,7 +59,7 @@ class ClientEventSerializer extends Serializer[UniqueIndexApi#ClientEvent] with 
   }
 
   override def read(kryo: Kryo, input: Input, `type`: Class[UniqueIndexApi#ClientEvent]): UniqueIndexApi#ClientEvent = {
-    val api = kryo.readObject(input, classOf[UniqueIndexApi])
+    val api = kryo.readObject(input, classOf[UniqueIndexApi], apiSerializer)
     import api._
 
     val event = input.readString() match {
@@ -87,7 +89,7 @@ class ClientEventSerializer extends Serializer[UniqueIndexApi#ClientEvent] with 
   }
 }
 
-class ClientIndexesStateMapSerializer extends Serializer[ClientIndexesStateMap] with Helper {
+class ClientIndexesStateMapSerializer(apiSerializer: ApiSerializer) extends Serializer[ClientIndexesStateMap] with Helper {
   val AcquisitionPendingClientStateName = "AcquisitionPendingClientState"
   val ReleasePendingClientStateName = "ReleasePendingClientState"
   val AcquiredClientStateName = "AcquiredClientState"
@@ -123,7 +125,7 @@ class ClientIndexesStateMapSerializer extends Serializer[ClientIndexesStateMap] 
   override def write(kryo: Kryo, output: Output, obj: ClientIndexesStateMap): Unit = {
     output.writeInt(obj.map.size, true)
     obj.map.values.foreach { state =>
-      kryo.writeObject(output, state.Api)
+      kryo.writeObject(output, state.Api, apiSerializer)
       writeApiState(kryo, output, state.Api)(state.reflect)
     }
   }
@@ -131,14 +133,14 @@ class ClientIndexesStateMapSerializer extends Serializer[ClientIndexesStateMap] 
   override def read(kryo: Kryo, input: Input, `type`: Class[ClientIndexesStateMap]): ClientIndexesStateMap = {
     val length = input.readInt(true)
     ClientIndexesStateMap((1 to length).map { _ =>
-      val api = kryo.readObject(input, classOf[UniqueIndexApi])
+      val api = kryo.readObject(input, classOf[UniqueIndexApi], apiSerializer)
       val state = readApiState(kryo, input, api)
       api -> state
     }.toMap)
   }
 }
 
-class ErrorSerializer extends Serializer[UniqueIndexApi#Error] with Helper {
+class ErrorSerializer(apiSerializer: ApiSerializer) extends Serializer[UniqueIndexApi#Error] with Helper {
   val DuplicateIndexName = "DuplicateIndex"
   val IndexIsFreeName = "IndexIsFree"
   val IndexIsAcquiredName = "IndexIsAcquired"
@@ -146,7 +148,7 @@ class ErrorSerializer extends Serializer[UniqueIndexApi#Error] with Helper {
 
   override def write(kryo: Kryo, output: Output, obj: UniqueIndexApi#Error): Unit = {
     import obj.Api._
-    kryo.writeObject(output, obj.Api)
+    kryo.writeObject(output, obj.Api, apiSerializer)
     obj.reflect match {
       case DuplicateIndex(entityId, key) =>
         output.writeString(DuplicateIndexName)
@@ -169,7 +171,7 @@ class ErrorSerializer extends Serializer[UniqueIndexApi#Error] with Helper {
   }
 
   override def read(kryo: Kryo, input: Input, `type`: Class[UniqueIndexApi#Error]): UniqueIndexApi#Error = {
-    val api = kryo.readObject(input, classOf[UniqueIndexApi])
+    val api = kryo.readObject(input, classOf[UniqueIndexApi], apiSerializer)
     import api._
     input.readString() match {
       case DuplicateIndexName =>
@@ -194,7 +196,7 @@ class ErrorSerializer extends Serializer[UniqueIndexApi#Error] with Helper {
   }
 }
 
-class ServerEventSerializer extends Serializer[UniqueIndexApi#ServerEvent] with Helper {
+class ServerEventSerializer(apiSerializer: ApiSerializer) extends Serializer[UniqueIndexApi#ServerEvent] with Helper {
   val AcquisitionStartedServerEventName   = "AcquisitionStartedServerEvent"
   val AcquisitionCompletedServerEventName = "AcquisitionCompletedServerEvent"
   val ReleaseStartedServerEventName       = "ReleaseStartedServerEvent"
@@ -202,7 +204,7 @@ class ServerEventSerializer extends Serializer[UniqueIndexApi#ServerEvent] with 
 
   override def write(kryo: Kryo, output: Output, obj: UniqueIndexApi#ServerEvent): Unit = {
     import obj.Api._
-    kryo.writeObject(output, obj.Api)
+    kryo.writeObject(output, obj.Api, apiSerializer)
     obj.reflect match {
       case AcquisitionStartedServerEvent(entityId) =>
         output.writeString(AcquisitionStartedServerEventName)
@@ -217,7 +219,7 @@ class ServerEventSerializer extends Serializer[UniqueIndexApi#ServerEvent] with 
   }
 
   override def read(kryo: Kryo, input: Input, `type`: Class[UniqueIndexApi#ServerEvent]): UniqueIndexApi#ServerEvent = {
-    val api = kryo.readObject(input, classOf[UniqueIndexApi])
+    val api = kryo.readObject(input, classOf[UniqueIndexApi], apiSerializer)
     import api._
     input.readString() match {
       case AcquisitionStartedServerEventName =>
@@ -234,14 +236,14 @@ class ServerEventSerializer extends Serializer[UniqueIndexApi#ServerEvent] with 
   }
 }
 
-class ServerStateSerializer extends Serializer[UniqueIndexApi#UniqueIndexServerState] with Helper {
+class ServerStateSerializer(apiSerializer: ApiSerializer) extends Serializer[UniqueIndexApi#UniqueIndexServerState] with Helper {
   val FreeServerStateName = "FreeServerState"
   val UnconfirmedServerStateName = "UnconfirmedServerState"
   val AcquiredServerStateName = "AcquiredServerState"
 
   override def write(kryo: Kryo, output: Output, obj: UniqueIndexApi#UniqueIndexServerState): Unit = {
     import obj.Api._
-    kryo.writeObject(output, obj.Api)
+    kryo.writeObject(output, obj.Api, apiSerializer)
     obj.reflect match {
       case FreeServerState() =>
         output.writeString(FreeServerStateName)
@@ -255,7 +257,7 @@ class ServerStateSerializer extends Serializer[UniqueIndexApi#UniqueIndexServerS
   }
 
   override def read(kryo: Kryo, input: Input, `type`: Class[UniqueIndexApi#UniqueIndexServerState]): UniqueIndexApi#UniqueIndexServerState = {
-    val api = kryo.readObject(input, classOf[UniqueIndexApi])
+    val api = kryo.readObject(input, classOf[UniqueIndexApi], apiSerializer)
     import api._
     input.readString() match {
       case FreeServerStateName =>
@@ -271,7 +273,7 @@ class ServerStateSerializer extends Serializer[UniqueIndexApi#UniqueIndexServerS
   }
 }
 
-class UniqueIndexRequestSerializer extends Serializer[UniqueIndexApi#UniqueIndexRequest[_]] with Helper {
+class UniqueIndexRequestSerializer(apiSerializer: ApiSerializer) extends Serializer[UniqueIndexApi#UniqueIndexRequest[_]] with Helper {
   val GetEntityIdName         = "GetEntityId"
   val StartAcquisitionName    = "StartAcquisition"
   val CommitAcquisitionName   = "CommitAcquisition"
@@ -282,7 +284,7 @@ class UniqueIndexRequestSerializer extends Serializer[UniqueIndexApi#UniqueIndex
 
   override def write(kryo: Kryo, output: Output, obj: UniqueIndexApi#UniqueIndexRequest[_]): Unit = {
     import obj.Api._
-    kryo.writeObject(output, obj.Api)
+    kryo.writeObject(output, obj.Api, apiSerializer)
     obj.reflect match {
       case GetEntityId(key) =>
         output.writeString(GetEntityIdName)
@@ -315,7 +317,7 @@ class UniqueIndexRequestSerializer extends Serializer[UniqueIndexApi#UniqueIndex
   }
 
   override def read(kryo: Kryo, input: Input, `type`: Class[UniqueIndexApi#UniqueIndexRequest[_]]): UniqueIndexApi#UniqueIndexRequest[_] = {
-    val api = kryo.readObject(input, classOf[UniqueIndexApi])
+    val api = kryo.readObject(input, classOf[UniqueIndexApi], apiSerializer)
     import api._
     input.readString() match {
       case GetEntityIdName =>
@@ -352,13 +354,13 @@ class UniqueIndexRequestSerializer extends Serializer[UniqueIndexApi#UniqueIndex
 }
 
 object UniqueIndexApiSerializer {
-  def registerSerializers(kryo: Kryo): Unit = {
-    kryo.addDefaultSerializer(classOf[UniqueIndexApi], new ApiSerializer)
-    kryo.addDefaultSerializer(classOf[UniqueIndexApi#ClientEvent], new ClientEventSerializer)
-    kryo.register(classOf[ClientIndexesStateMap], new ClientIndexesStateMapSerializer)
-    kryo.addDefaultSerializer(classOf[UniqueIndexApi#Error], new ErrorSerializer)
-    kryo.addDefaultSerializer(classOf[UniqueIndexApi#ServerEvent], new ServerEventSerializer)
-    kryo.addDefaultSerializer(classOf[UniqueIndexApi#UniqueIndexServerState], new ServerStateSerializer)
-    kryo.addDefaultSerializer(classOf[UniqueIndexApi#UniqueIndexRequest[_]], new UniqueIndexRequestSerializer)
+  def registerSerializers(kryo: Kryo, mirror: Mirror): Unit = {
+    implicit val apiSerializer: ApiSerializer = new ApiSerializer(mirror)
+    kryo.addDefaultSerializer(classOf[UniqueIndexApi#ClientEvent], new ClientEventSerializer(apiSerializer))
+    kryo.register(classOf[ClientIndexesStateMap], new ClientIndexesStateMapSerializer(apiSerializer))
+    kryo.addDefaultSerializer(classOf[UniqueIndexApi#Error], new ErrorSerializer(apiSerializer))
+    kryo.addDefaultSerializer(classOf[UniqueIndexApi#ServerEvent], new ServerEventSerializer(apiSerializer))
+    kryo.addDefaultSerializer(classOf[UniqueIndexApi#UniqueIndexServerState], new ServerStateSerializer(apiSerializer))
+    kryo.addDefaultSerializer(classOf[UniqueIndexApi#UniqueIndexRequest[_]], new UniqueIndexRequestSerializer(apiSerializer))
   }
 }

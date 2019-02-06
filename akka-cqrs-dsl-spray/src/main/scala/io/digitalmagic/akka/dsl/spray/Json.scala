@@ -133,17 +133,18 @@ private object JsonHelper {
 object Json extends DefaultJsonProtocol {
   import JsonHelper._
 
-  implicit object InstantJsonFormat extends RootJsonFormat[Instant] {
+  implicit object JavaInstantJsonFormat extends RootJsonFormat[Instant] {
     def read(json: JsValue): Instant = Instant.parse(json.convertTo[String])
     def write(obj: Instant) = JsString(obj.toString)
   }
 
-  implicit val apiFormat: JsonFormat[UniqueIndexApi] = new JsonFormat[UniqueIndexApi] {
+  import scala.reflect.runtime.universe.Mirror
+  implicit def apiFormat(implicit mirror: Mirror): JsonFormat[UniqueIndexApi] = new JsonFormat[UniqueIndexApi] {
     override def read(json: JsValue): UniqueIndexApi = UniqueIndexApi.getApiById(json.convertTo[String])
     override def write(obj: UniqueIndexApi): JsValue = UniqueIndexApi.getApiIdFor(obj).toJson
   }
 
-  implicit val clientEventFormat: RootJsonFormat[UniqueIndexApi#ClientEvent] = new RootJsonFormat[UniqueIndexApi#ClientEvent] {
+  implicit def clientEventFormat(implicit mirror: Mirror): RootJsonFormat[UniqueIndexApi#ClientEvent] = new RootJsonFormat[UniqueIndexApi#ClientEvent] {
     override def read(json: JsValue): UniqueIndexApi#ClientEvent = {
       val fields = json.asJsObject.fields
       val value = fields("value")
@@ -186,7 +187,7 @@ object Json extends DefaultJsonProtocol {
     }
   }
 
-  implicit val clientIndexesStateMapFormat: JsonFormat[ClientIndexesStateMap] = new JsonFormat[ClientIndexesStateMap] {
+  implicit def clientIndexesStateMapFormat(implicit mirror: Mirror): JsonFormat[ClientIndexesStateMap] = new JsonFormat[ClientIndexesStateMap] {
     override def read(json: JsValue): ClientIndexesStateMap = {
       val fields = json.asJsObject.fields
       ClientIndexesStateMap(
@@ -204,7 +205,7 @@ object Json extends DefaultJsonProtocol {
     }
   }
 
-  implicit def clientStateFormat[T <: PersistentState](implicit persistentStateFormat: JsonFormat[T]): RootJsonFormat[EventSourcedActorWithInterpreter.EventSourcedActorState[T]] = new RootJsonFormat[EventSourcedActorWithInterpreter.EventSourcedActorState[T]] {
+  implicit def clientStateFormat[T <: PersistentState](implicit persistentStateFormat: JsonFormat[T], mirror: Mirror): RootJsonFormat[EventSourcedActorWithInterpreter.EventSourcedActorState[T]] = new RootJsonFormat[EventSourcedActorWithInterpreter.EventSourcedActorState[T]] {
     override def read(json: JsValue): EventSourcedActorWithInterpreter.EventSourcedActorState[T] = {
       val fields = json.asJsObject.fields
       EventSourcedActorWithInterpreter.EventSourcedActorState(
@@ -221,7 +222,7 @@ object Json extends DefaultJsonProtocol {
     }
   }
 
-  implicit val errorFormat: RootJsonFormat[UniqueIndexApi#Error] = new RootJsonFormat[UniqueIndexApi#Error] {
+  implicit def errorFormat(implicit mirror: Mirror): RootJsonFormat[UniqueIndexApi#Error] = new RootJsonFormat[UniqueIndexApi#Error] {
     override def read(json: JsValue): UniqueIndexApi#Error = {
       val fields = json.asJsObject.fields
       val value = fields("value")
@@ -257,7 +258,7 @@ object Json extends DefaultJsonProtocol {
     }
   }
 
-  implicit val serverEventFormat: RootJsonFormat[UniqueIndexApi#ServerEvent] = new RootJsonFormat[UniqueIndexApi#ServerEvent] {
+  implicit def serverEventFormat(implicit mirror: Mirror): RootJsonFormat[UniqueIndexApi#ServerEvent] = new RootJsonFormat[UniqueIndexApi#ServerEvent] {
     override def read(json: JsValue): UniqueIndexApi#ServerEvent = {
       val fields = json.asJsObject.fields
       val value = fields("value")
@@ -296,7 +297,7 @@ object Json extends DefaultJsonProtocol {
     }
   }
 
-  implicit val serverStateFormat: RootJsonFormat[UniqueIndexApi#UniqueIndexServerState] = new RootJsonFormat[UniqueIndexApi#UniqueIndexServerState] {
+  implicit def serverStateFormat(implicit mirror: Mirror): RootJsonFormat[UniqueIndexApi#UniqueIndexServerState] = new RootJsonFormat[UniqueIndexApi#UniqueIndexServerState] {
     override def read(json: JsValue): UniqueIndexApi#UniqueIndexServerState = {
       val fields = json.asJsObject.fields
       val value = fields("value")
@@ -330,7 +331,7 @@ object Json extends DefaultJsonProtocol {
     }
   }
 
-  implicit val uniqueIndexRequestFormat: RootJsonFormat[UniqueIndexApi#UniqueIndexRequest[_]] = new RootJsonFormat[UniqueIndexApi#UniqueIndexRequest[_]] {
+  implicit def uniqueIndexRequestFormat(implicit mirror: Mirror): RootJsonFormat[UniqueIndexApi#UniqueIndexRequest[_]] = new RootJsonFormat[UniqueIndexApi#UniqueIndexRequest[_]] {
     override def read(json: JsValue): UniqueIndexApi#UniqueIndexRequest[_] = {
       val fields = json.asJsObject.fields
       val value = fields("value")

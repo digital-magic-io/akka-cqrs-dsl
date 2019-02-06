@@ -1,14 +1,13 @@
 package io.digitalmagic.akka.dsl
 
-import java.time.Instant
-
 import iotaz._
 import scalaz._
 
 import scala.reflect.ClassTag
 
 trait Event extends Product with Serializable {
-  var timestamp: Instant = Instant.now()
+  type TimestampType
+  var timestamp: TimestampType
 }
 
 trait PersistentState extends Product with Serializable {

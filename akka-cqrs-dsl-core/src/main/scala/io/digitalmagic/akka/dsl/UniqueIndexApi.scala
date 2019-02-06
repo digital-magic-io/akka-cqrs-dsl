@@ -1,5 +1,7 @@
 package io.digitalmagic.akka.dsl
 
+import java.time.Instant
+
 import akka.actor.{ActorRef, ActorSelection}
 import io.digitalmagic.akka.dsl.API._
 import iotaz.{Cop, CopK}
@@ -17,9 +19,9 @@ object UniqueIndexApi {
   type IndexApiAux[E, I <: UniqueIndexApi, T[_]] = I { type EntityIdType = E; type IndexApiType[X] = T[X] }
   type ClientQueryAux[E, I <: UniqueIndexApi, T[_]] = I { type EntityIdType = E; type ClientQueryType[X] = T[X] }
 
-  import scala.reflect.runtime.currentMirror
-  def getApiIdFor(api: UniqueIndexApi): String = currentMirror.reflect(api).symbol.fullName
-  def getApiById(id: String): UniqueIndexApi = currentMirror.reflectModule(currentMirror.staticModule(id)).instance.asInstanceOf[UniqueIndexApi]
+  import scala.reflect.runtime.universe.Mirror
+  def getApiIdFor(api: UniqueIndexApi)(implicit mirror: Mirror): String = mirror.reflect(api).symbol.fullName
+  def getApiById(id: String)(implicit mirror: Mirror): UniqueIndexApi = mirror.reflectModule(mirror.staticModule(id)).instance.asInstanceOf[UniqueIndexApi]
 
   abstract class Base[E, K](dummy: Int, E: StringRepresentable[E], K: StringRepresentable[K]) extends UniqueIndexApi {
     Self: Singleton =>
@@ -83,6 +85,8 @@ trait UniqueIndexApi {
   type ClientEventType >: ClientEvent <: ClientEvent
   // cannot be trait otherwise due to scala bug pattern matching does not work
   sealed abstract class ClientEvent extends Event with ApiAsset {
+    override type TimestampType = Instant
+    var timestamp: Instant = Instant.now()
     def key: KeyType
     def reflect: Api.ClientEvent = this
   }
@@ -175,6 +179,8 @@ trait UniqueIndexApi {
   }
 
   sealed abstract class ServerEvent extends Event with ApiAsset {
+    override type TimestampType = Instant
+    var timestamp: Instant = Instant.now()
     def reflect: Api.ServerEvent = this
   }
   case class AcquisitionStartedServerEvent(entityId: EntityIdType) extends ServerEvent

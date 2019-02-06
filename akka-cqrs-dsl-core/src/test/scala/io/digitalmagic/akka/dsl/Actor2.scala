@@ -1,5 +1,7 @@
 package io.digitalmagic.akka.dsl
 
+import java.time.Instant
+
 import akka.actor.{ActorSelection, Props}
 import io.digitalmagic.akka.dsl.API._
 import iotaz.{CopK, TNilK}
@@ -24,7 +26,10 @@ object Actor2 {
   }
 
   sealed trait Actor2Event extends Event
-  case class ValueSet(value: Int) extends Actor2Event
+  case class ValueSet(value: Int) extends Actor2Event {
+    override type TimestampType = Instant
+    override var timestamp: Instant = Instant.now
+  }
 
   case class Actor2State(value: Int) extends PersistentState {
     override type EventType = Actor2Event

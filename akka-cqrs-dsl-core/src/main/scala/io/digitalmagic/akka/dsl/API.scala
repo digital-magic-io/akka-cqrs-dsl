@@ -46,13 +46,13 @@ object API {
     override def failure(error: ResponseError): QueryResult[T] = QueryResult(Left(error))
   }
 
-  implicit class PimpedActorRef(val actorRef: ActorRef) extends AnyRef {
+  implicit class PimpedActorRef(val actorRef: ActorRef) extends AnyVal {
     def query[T](msg: Query[T])(implicit tag: ClassTag[T], akkaTimeout: Timeout = 5 seconds): QueryProcessor[T] = QueryProcessor[T](Left(actorRef), msg)
 
     def command[T](msg: Command[T])(implicit tag: ClassTag[T], akkaTimeout: Timeout = 5 seconds): CommandProcessor[T] = CommandProcessor[T](Left(actorRef), msg)
   }
 
-  implicit class PimpedActorSelection(val actorSelection: ActorSelection) extends AnyRef {
+  implicit class PimpedActorSelection(val actorSelection: ActorSelection) extends AnyVal {
     def query[T](msg: Query[T])(implicit tag: ClassTag[T], akkaTimeout: Timeout = 5 seconds): QueryProcessor[T] = QueryProcessor[T](Right(actorSelection), msg)
 
     def command[T](msg: Command[T])(implicit tag: ClassTag[T], akkaTimeout: Timeout = 5 seconds): CommandProcessor[T] = CommandProcessor[T](Right(actorSelection), msg)

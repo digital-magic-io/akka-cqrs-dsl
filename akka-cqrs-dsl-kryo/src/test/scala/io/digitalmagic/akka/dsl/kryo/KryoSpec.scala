@@ -2,6 +2,8 @@ package io.digitalmagic.akka.dsl.kryo
 
 import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.io.{Input, Output}
+import com.esotericsoftware.kryo.util.{DefaultClassResolver, DefaultStreamFactory, MapReferenceResolver}
+import com.romix.scala.serialization.kryo.ScalaKryo
 import io.digitalmagic.akka.dsl.EventSourcedActorWithInterpreter.EventSourcedActorState
 import io.digitalmagic.akka.dsl.{ClientIndexesStateMap, Event, PersistentState, UniqueIndexApi}
 import org.objenesis.strategy.StdInstantiatorStrategy
@@ -20,12 +22,13 @@ object KryoSpec {
 class KryoSpec extends WordSpecLike with Matchers {
   import KryoSpec._
 
-  val kryo = new Kryo()
+  val kryo = new ScalaKryo(new DefaultClassResolver(), new MapReferenceResolver(), new DefaultStreamFactory())
   val instStrategy = kryo.getInstantiatorStrategy.asInstanceOf[Kryo.DefaultInstantiatorStrategy]
   instStrategy.setFallbackInstantiatorStrategy(new StdInstantiatorStrategy())
   kryo.setInstantiatorStrategy(instStrategy)
 
-  UniqueIndexApiSerializer.registerSerializers(kryo)
+  import scala.reflect.runtime
+  UniqueIndexApiSerializer.registerSerializers(kryo, runtime.currentMirror)
 
   def write(obj: Any): Array[Byte] = {
     val output = new Output(1024, -1)

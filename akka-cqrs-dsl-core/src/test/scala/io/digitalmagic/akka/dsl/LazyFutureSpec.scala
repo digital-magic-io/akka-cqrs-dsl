@@ -15,7 +15,7 @@ class LazyFutureSpec extends Specification with ScalaCheck { def is =
     """
 
   implicit def arbitraryLazyFuture[T](implicit arb: Arbitrary[T]): Arbitrary[LazyFuture[T]] = Arbitrary[LazyFuture[T]] {
-    arb.arbitrary.map(a => LazyFuture(implicit ec => Future(a)))
+    arb.arbitrary.map(LazyFuture.successful)
   }
 
   implicit def equalLazyFuture[T](implicit eq: Equal[T]): Equal[LazyFuture[T]] = new Equal[LazyFuture[T]] {

@@ -1,5 +1,7 @@
 package io.digitalmagic.akka.dsl
 
+import java.time.Instant
+
 import akka.actor.Props
 import io.digitalmagic.akka.dsl.API._
 import iotaz.TListK.:::
@@ -11,7 +13,10 @@ import scala.reflect.ClassTag
 
 object Adder {
   trait MyEventType extends Event
-  case object MyEvent extends MyEventType
+  case object MyEvent extends MyEventType {
+    override type TimestampType = Instant
+    override var timestamp: Instant = Instant.now
+  }
 
   case class MyState(n: Int = 0) extends PersistentState {
     override type EventType = MyEventType
