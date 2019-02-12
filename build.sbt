@@ -17,8 +17,7 @@ val buildSettings = Seq(
     "-language:postfixOps",
     "-language:implicitConversions",
     "-language:higherKinds",
-    "-Ypartial-unification",
-    "-P:typed-holes:log-level:error"
+    "-Ypartial-unification"
   ),
   resolvers ++= Seq(
     Resolver.sonatypeRepo("releases"),
