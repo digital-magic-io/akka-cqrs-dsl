@@ -5,7 +5,7 @@ startYear            := Some(2016)
 
 val buildSettings = Seq(
   organization := "io.digital-magic",
-  version      := "2.0.6",  // don't forget to bump version in .bintray.json
+  version      := "2.0.7",  // don't forget to bump version in .bintray.json
   parallelExecution in Test := false,
   scalaVersion       := Dependencies.Versions.scala212,
   crossScalaVersions := Seq(Dependencies.Versions.scala212),
@@ -17,7 +17,8 @@ val buildSettings = Seq(
     "-language:postfixOps",
     "-language:implicitConversions",
     "-language:higherKinds",
-    "-Ypartial-unification"
+    "-Ypartial-unification",
+    "-P:typed-holes:log-level:error"
   ),
   resolvers ++= Seq(
     Resolver.sonatypeRepo("releases"),

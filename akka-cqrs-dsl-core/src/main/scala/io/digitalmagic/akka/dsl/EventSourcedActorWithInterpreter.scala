@@ -142,7 +142,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
     e => s => interpreters.underlying.values(e.index).asInstanceOf[ClientEventInterpreterS[EntityIdType, Any]](e.value, s)
   def clientEventInterpreter: ClientEventInterpreter
 
-  private var state: EventSourcedActorState[State] = EventSourcedActorState(persistentState.empty)
+  protected var state: EventSourcedActorState[State] = EventSourcedActorState(persistentState.empty)
   private var needsPassivation: Boolean = false
   private var stashingBehaviourActive: Boolean = false
   private def checkAndPassivate(): Unit = {
