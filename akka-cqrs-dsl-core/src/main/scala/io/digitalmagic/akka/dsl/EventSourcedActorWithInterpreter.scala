@@ -262,7 +262,9 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
     override def apply[A](fa: T[A]): IndexFuture[A] = api.castIndexApi(fa) match {
       case api.Acquire(key) =>
         state.indexesState.get(api).flatMap(_.get(key)) match {
-          case None => // not yet acquired
+          case None | Some(api.AcquisitionPendingClientState()) =>
+            // not yet acquired
+            // or acquisition has been started, in this case re-acquire because previous attempt could fail with duplicate key, but that has not been reflected in our state
             val p = Promise[IndexResult[Unit]]
             persist(api.AcquisitionStartedClientEvent(key)) { event =>
               processIndexEvent(event)
@@ -276,8 +278,6 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
               }
             }
             p.future
-          case Some(api.AcquisitionPendingClientState()) => // acquisition has been started
-            Future.successful((f => f(), IndexPostActions.commitAcquisition(api)(entityId, key), ()))
           case Some(api.ReleasePendingClientState()) => // release has been started, so roll it back
             Future.successful((f => f(), IndexPostActions.rollbackRelease(api)(entityId, key), ()))
           case Some(api.AcquiredClientState()) => // already acquired

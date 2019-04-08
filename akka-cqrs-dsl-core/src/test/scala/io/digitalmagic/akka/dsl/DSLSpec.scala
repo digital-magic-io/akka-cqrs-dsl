@@ -238,7 +238,7 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
 
       clusterSharding.startProperly(
         typeName = "example",
-        entityIdToEntityProps = IndexExampleActor.props,
+        entityIdToEntityProps = IndexExampleActor.props("example", _),
         settings = clusterShardingSettings,
         extractEntityId = IndexExampleActor.extractEntityId,
         extractShardId = IndexExampleActor.extractShardId,
@@ -281,7 +281,7 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
 
       clusterSharding.startProperly(
         typeName = "example-2",
-        entityIdToEntityProps = IndexExampleActor.props,
+        entityIdToEntityProps = IndexExampleActor.props("example-2", _),
         settings = clusterShardingSettings,
         extractEntityId = IndexExampleActor.extractEntityId,
         extractShardId = IndexExampleActor.extractShardId,
@@ -333,6 +333,45 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
         val resp = index1.indexActor query index1Api.GetEntityId("key2") map identity
         val optionEntityId = Await.result(resp, 3 seconds)
         optionEntityId shouldBe Some("e3")
+      }
+    }
+
+    "not allow to acquire occupied index on second attempt" in {
+      import IndexExample._
+
+      implicit val index1 = new ActorBasedUniqueIndex[index1Api.type](system.actorSelection("system/sharding/example-3"), system.actorSelection("system/sharding/index1-3"))
+      implicit val index2 = new ActorBasedUniqueIndex[index2Api.type](system.actorSelection("system/sharding/example-3"), system.actorSelection("system/sharding/index2-3"))
+
+      val clusterSharding = ClusterSharding(system)
+      val clusterShardingSettings = ClusterShardingSettings(system)
+      val shardAllocationStrategy = clusterSharding.defaultShardAllocationStrategy(clusterShardingSettings)
+
+      UniqueIndexActorDef(index1Api, "index1-3").start(clusterSharding, clusterShardingSettings)
+      UniqueIndexActorDef(index2Api, "index2-3").start(clusterSharding, clusterShardingSettings)
+
+      clusterSharding.startProperly(
+        typeName = "example-3",
+        entityIdToEntityProps = IndexExampleActor.props("example-3", _),
+        settings = clusterShardingSettings,
+        extractEntityId = IndexExampleActor.extractEntityId,
+        extractShardId = IndexExampleActor.extractShardId,
+        allocationStrategy = shardAllocationStrategy,
+        handOffStopMessage = EventSourcedActorWithInterpreter.Stop
+      )
+
+      {
+        val resp = index1.entityActor command IndexExample.GenericCommand("e1", List(IndexExample.AcquireAction("key"))) map identity
+        Await.result(resp, 3 seconds) shouldBe (())
+      }
+
+      {
+        val resp = index1.entityActor command IndexExample.GenericCommand("e2", List(IndexExample.AcquireAction("key"))) map identity
+        an [index1Api.DuplicateIndex] should be thrownBy Await.result(resp, 3 seconds)
+      }
+
+      {
+        val resp = index1.entityActor command IndexExample.GenericCommand("e2", List(IndexExample.AcquireAction("key"))) map identity
+        an [index1Api.DuplicateIndex] should be thrownBy Await.result(resp, 3 seconds)
       }
     }
   }

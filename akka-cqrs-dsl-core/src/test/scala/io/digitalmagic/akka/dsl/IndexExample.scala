@@ -111,10 +111,11 @@ object IndexExampleActor {
     msg => (math.abs(extractEntityId(msg)._1.hashCode) % 100).toString
   }
 
-  def props(entityId: String)(implicit I1: UniqueIndexInterface[IndexExample.index1Api.type], I2: UniqueIndexInterface[IndexExample.index2Api.type]) = Props(IndexExampleActor(entityId))
+  def props(name: String, entityId: String)(implicit I1: UniqueIndexInterface[IndexExample.index1Api.type], I2: UniqueIndexInterface[IndexExample.index2Api.type]) =
+    Props(IndexExampleActor(name, entityId))
 }
 
-case class IndexExampleActor(entityId: String)(implicit I1: UniqueIndexInterface[IndexExample.index1Api.type], I2: UniqueIndexInterface[IndexExample.index2Api.type]) extends IndexExample with EventSourcedActorWithInterpreter {
+case class IndexExampleActor(name: String, entityId: String)(implicit I1: UniqueIndexInterface[IndexExample.index1Api.type], I2: UniqueIndexInterface[IndexExample.index2Api.type]) extends IndexExample with EventSourcedActorWithInterpreter {
   import IndexExample._
 
   context.setReceiveTimeout(1 seconds)
@@ -124,5 +125,5 @@ case class IndexExampleActor(entityId: String)(implicit I1: UniqueIndexInterface
   override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, ?] = CopK.NaturalTransformation.summon[Index#ClientAlgebra, Const[Unit, ?]]
   override def clientEventInterpreter: ClientEventInterpreter = implicitly
 
-  override def persistenceId = s"${context.system.name}.IndexExample.v1.$entityId"
+  override def persistenceId = s"${context.system.name}.IndexExample.v1.$name.$entityId"
 }
