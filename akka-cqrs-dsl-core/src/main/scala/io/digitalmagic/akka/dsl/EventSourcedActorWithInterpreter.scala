@@ -353,6 +353,8 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
     }
   }
 
+  private case class FailStep[U](rollbackActions: IndexPostActions, request: Request[U], error: Throwable) extends NoSerializationVerificationNeeded
+
   def interpretStep(step: NextStep): Unit = {
     step.continuation { () =>
       val Need((log, programRes)) = step.resume
@@ -376,12 +378,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
           val replyTo = sender()
           idx.trans(indexInterpreter).run onComplete {
             case scala.util.Success(rest) => self.tell(step.nextIndexStep(rest._1, rest._2, rest._3), replyTo)
-            case scala.util.Failure(err) =>
-              rollback(true, step.postActions)
-              err match {
-                case e: ResponseError => replyTo ! step.request.failure(e)
-                case e                => replyTo ! step.request.failure(InternalError(e))
-              }
+            case scala.util.Failure(err) => self.tell(FailStep(step.postActions, step.request, err), replyTo)
           }
 
         case \/-(ex) =>
@@ -389,12 +386,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
           val queryFuture = ex.trans(interpreter).run
           queryFuture(dispatcher) onComplete {
             case scala.util.Success(rest) => self.tell(step.nextQueryStep(rest), replyTo)
-            case scala.util.Failure(err) =>
-              rollback(true, step.postActions)
-              err match {
-                case e: ResponseError => replyTo ! step.request.failure(e)
-                case e                => replyTo ! step.request.failure(InternalError(e))
-              }
+            case scala.util.Failure(err) => self.tell(FailStep(step.postActions, step.request, err), replyTo)
           }
       }
     }
@@ -407,6 +399,12 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
 
   private def processNextStep: Receive = {
     case nextStep: NextStep => interpretStep(nextStep)
+    case FailStep(rollbackActions, request, error) =>
+      rollback(true, rollbackActions)
+      error match {
+        case e: ResponseError => sender() ! request.failure(e)
+        case e                => sender() ! request.failure(InternalError(e))
+      }
   }
 
   implicit def clientQueryHandler[I <: UniqueIndexApi, T[_]](implicit api: UniqueIndexApi.ClientQueryAux[EntityIdType, I, T]): T ~> Const[Unit, ?] = Lambda[T ~> Const[Unit, ?]] {
