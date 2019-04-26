@@ -6,7 +6,7 @@ import akka.fixes.ClusterShardingExts.implicits._
 import io.digitalmagic.akka.dsl.API._
 import iotaz.TListK.:::
 import iotaz.{CopK, TNilK}
-import scalaz._
+import scalaz.{Scalaz, _}
 import Scalaz._
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings}
 
@@ -197,6 +197,7 @@ case class UniqueIndexActor[I <: UniqueIndexApi](indexApi: I, name: String, enti
   override def interpreter: QueryAlgebra ~> LazyFuture = CopK.NaturalTransformation.of[QueryAlgebra, LazyFuture](I.clientApiInterpreter(indexApi))
   override def indexInterpreter: Index#Algebra ~> IndexFuture = CopK.NaturalTransformation.summon[Index#Algebra, IndexFuture]
   override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, ?] = CopK.NaturalTransformation.summon[Index#ClientAlgebra, Const[Unit, ?]]
+  override def localApiInterpreter: Index#LocalAlgebra ~> Id = CopK.NaturalTransformation.summon[Index#LocalAlgebra, Id]
   override def clientEventInterpreter: ClientEventInterpreter = implicitly
 
   override val persistenceId = s"${context.system.name}.UniqueIndexActor.$name.v1.$entityId"

@@ -21,8 +21,10 @@ sealed trait IndexList {
   type ClientAlgebra[A] <: CopK[ClientAlgebraList, A]
   type ClientEventList <: TList
   type ClientEventAlgebra <: Cop[ClientEventList]
+  type LocalAlgebraList <: TListK
+  type LocalAlgebra[A] <: CopK[LocalAlgebraList, A]
 
-  type + [I <: UniqueIndexApi] = WithIndex[I ::: List, I#IndexApiType :::: AlgebraList, I#ClientQueryType :::: ClientAlgebraList, I#ClientEventType ::: ClientEventList]
+  type + [I <: UniqueIndexApi] = WithIndex[I ::: List, I#IndexApiType :::: AlgebraList, I#ClientQueryType :::: ClientAlgebraList, I#ClientEventType ::: ClientEventList, I#LocalQueryType :::: LocalAlgebraList]
 }
 
 final class EmptyIndexList extends IndexList {
@@ -33,9 +35,11 @@ final class EmptyIndexList extends IndexList {
   type ClientAlgebra[A] = CopK[ClientAlgebraList, A]
   type ClientEventList = TNil
   type ClientEventAlgebra = Cop[ClientEventList]
+  type LocalAlgebraList = TNilK
+  type LocalAlgebra[A] = CopK[LocalAlgebraList, A]
 }
 
-final class WithIndex[L <: TList, AL <: TListK, CAL <: TListK, CEL <: TList] extends IndexList {
+final class WithIndex[L <: TList, AL <: TListK, CAL <: TListK, CEL <: TList, LAL <: TListK] extends IndexList {
   type List = L
   type AlgebraList = AL
   type Algebra[A] = CopK[AlgebraList, A]
@@ -43,6 +47,8 @@ final class WithIndex[L <: TList, AL <: TListK, CAL <: TListK, CEL <: TList] ext
   type ClientAlgebra[A] = CopK[ClientAlgebraList, A]
   type ClientEventList = CEL
   type ClientEventAlgebra = Cop[ClientEventList]
+  type LocalAlgebraList = LAL
+  type LocalAlgebra[A] = CopK[LocalAlgebraList, A]
 }
 
 trait ClientRuntime[L <: TList, IL <: IndexList] {

@@ -65,7 +65,7 @@ object EventSourcedActorWithInterpreter {
     def apply[I <: UniqueIndexApi](api: I)(key: api.KeyType, commit: () => Unit, commitEvent: Option[api.ClientEventType], rollback: () => Unit, rollbackEvent: Option[api.ClientEventType]): IndexPostActions =
       IndexPostActions(Map(IndexPostActionKey(api)(key) -> LastVal(IndexPostAction(commit, commitEvent, rollback, rollbackEvent))))
 
-    def commitAcquisition[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: UniqueIndexInterface[I]): IndexPostActions =
+    def commitAcquisition[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: IndexInterface[I]): IndexPostActions =
       IndexPostActions(api)(key,
         () => A.lowLevelApi(api).commitAcquisition(entityId, key),
         Some(api.AcquisitionCompletedClientEvent(key)),
@@ -73,7 +73,7 @@ object EventSourcedActorWithInterpreter {
         Some(api.AcquisitionAbortedClientEvent(key))
       )
 
-    def rollbackAcquisition[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: UniqueIndexInterface[I]): IndexPostActions =
+    def rollbackAcquisition[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: IndexInterface[I]): IndexPostActions =
       IndexPostActions(api)(key,
         () => A.lowLevelApi(api).rollbackAcquisition(entityId, key),
         Some(api.AcquisitionAbortedClientEvent(key)),
@@ -81,7 +81,7 @@ object EventSourcedActorWithInterpreter {
         Some(api.AcquisitionAbortedClientEvent(key))
       )
 
-    def commitRelease[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: UniqueIndexInterface[I]): IndexPostActions =
+    def commitRelease[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: IndexInterface[I]): IndexPostActions =
       IndexPostActions(api)(key,
         () => A.lowLevelApi(api).commitRelease(entityId, key),
         Some(api.ReleaseCompletedClientEvent(key)),
@@ -89,7 +89,7 @@ object EventSourcedActorWithInterpreter {
         Some(api.ReleaseAbortedClientEvent(key))
       )
 
-    def rollbackRelease[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: UniqueIndexInterface[I]): IndexPostActions =
+    def rollbackRelease[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: IndexInterface[I]): IndexPostActions =
       IndexPostActions(api)(key,
         () => A.lowLevelApi(api).rollbackRelease(entityId, key),
         Some(api.ReleaseAbortedClientEvent(key)),
@@ -109,9 +109,9 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   val logger: LoggingAdapter = Logging.getLogger(context.system, this)
 
   type Logger[T] = WriterT[Identity, Log, T]
-  type Result[T] = ResponseError \/ (Events, T, State)
+  type Result[T] = ResponseError \/ ((Events, T, State) \/ Coyoneda[Index#LocalAlgebra, FreeT[Coyoneda[Index#LocalAlgebra,?],EitherT[FreeT[Coyoneda[Index#Algebra,?],FreeT[Coyoneda[QueryAlgebra,?],Logger,?],?],ResponseError,?],(Events, T, State)]])
 
-  type Program[A] = RWST[EitherT[FreeT[Coyoneda[Index#Algebra, ?], FreeT[Coyoneda[QueryAlgebra, ?], Logger, ?], ?], ResponseError, ?], Environment, Events, State, A]
+  type Program[A] = RWST[FreeT[Coyoneda[Index#LocalAlgebra, ?], EitherT[FreeT[Coyoneda[Index#Algebra, ?], FreeT[Coyoneda[QueryAlgebra, ?], Logger, ?], ?], ResponseError, ?], ?], Environment, Events, State, A]
   override lazy val programMonad: Monad[Program] = Monad[Program]
 
   private type QueryStep[T] = FreeT[Coyoneda[QueryAlgebra, ?], Logger, Result[T] \/ Coyoneda[Index#Algebra, IndexStep[T]]]
@@ -121,6 +121,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   override lazy val environmentReaderMonad: MonadReader[Program, Environment] = MonadReader[Program, Environment]
   override lazy val eventWriterMonad: MonadTell[Program, Events] = MonadTell[Program, Events]
   override lazy val stateMonad: MonadState[Program, State] = MonadState[Program, State]
+  override lazy val localIndexQueryMonad: MonadFree[Program, Coyoneda[Index#LocalAlgebra, ?]] = MonadFree[Program, Coyoneda[Index#LocalAlgebra, ?]]
   override lazy val errorMonad: MonadError[Program, ResponseError] = MonadError[Program, ResponseError]
   override lazy val freeMonad: MonadFree[Program, Coyoneda[QueryAlgebra, ?]] = MonadFree[Program, Coyoneda[QueryAlgebra, ?]]
   override lazy val indexFreeMonad: MonadFree[Program, Coyoneda[Index#Algebra, ?]] = MonadFree[Program, Coyoneda[Index#Algebra, ?]]
@@ -136,6 +137,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   def interpreter: QueryAlgebra ~> LazyFuture
   def indexInterpreter: Index#Algebra ~> IndexFuture
   def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, ?]
+  def localApiInterpreter: Index#LocalAlgebra ~> Id
 
   type ClientEventInterpreter = Index#ClientEventAlgebra => ClientIndexesStateMap => ClientIndexesStateMap
   implicit def genClientEventInterpreter(implicit interpreters: evidence.All[TList.Op.Map[ClientEventInterpreterS[EntityIdType, ?], Index#ClientEventList]]): ClientEventInterpreter =
@@ -215,7 +217,15 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
 
   abstract override def receiveRecoverRecoveryComplete(): Unit = {
     super.receiveRecoverRecoveryComplete()
-    rollback(false, IndexPostActions.empty)
+    val actions = state.indexesState.map.toList.foldMap { case (api, _) =>
+      val apiState = state.indexesState.get(api).get
+      apiState.map.toList.foldMap {
+        case (key, apiState.Api.AcquisitionPendingClientState()) => IndexPostActions(api)(key, () => (), None, () => (), Some(api.AcquisitionAbortedClientEvent(key)))
+        case (key, apiState.Api.ReleasePendingClientState()) => IndexPostActions(api)(key, () => (), None, () => (), Some(api.ReleaseAbortedClientEvent(key)))
+        case (key, apiState.Api.AcquiredClientState()) => IndexPostActions.empty
+      }
+    }
+    rollback(false, actions)
   }
 
   override protected def onPersistRejected(cause: Throwable, event: Any, seqNr: Long): Unit = {
@@ -257,7 +267,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   }
 
   implicit def interpretIndex[I <: UniqueIndexApi, T[_]](implicit api: UniqueIndexApi.IndexApiAux[EntityIdType, I, T],
-                                                         A: UniqueIndexInterface[I]): T ~> IndexFuture = new (T ~> IndexFuture) {
+                                                         A: IndexInterface[I]): T ~> IndexFuture = new (T ~> IndexFuture) {
 
     override def apply[A](fa: T[A]): IndexFuture[A] = api.castIndexApi(fa) match {
       case api.Acquire(key) =>
@@ -308,6 +318,10 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
     }
   }
 
+  implicit def interpretLocalApi[I <: UniqueIndexApi, T[_]](implicit api: UniqueIndexApi.LocalApiAux[EntityIdType, I, T]): T ~> Id = Lambda[T ~> Id] {
+    case api.GetMyEntries => state.indexesState.get(api).fold(Set.empty[api.KeyType])(_.acquiredKeys)
+  }
+
   private trait NextStep {
     type T
     val request: Request[T]
@@ -349,11 +363,14 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
           rollback(true, step.postActions)
           sender() ! step.request.failure(error)
 
-        case -\/(-\/(\/-((events, result, newState)))) =>
+        case -\/(-\/(\/-(-\/((events, result, newState))))) =>
           commit(events, step.postActions) { () =>
             state = state.copy(underlying = newState)
             sender() ! step.request.success(result)
           }
+
+        case -\/(-\/(\/-(\/-(local)))) =>
+          interpretStep(step.nextIndexStep(f => f(), IndexPostActions.empty, local.trans(localApiInterpreter).run.resume.run))
 
         case -\/(\/-(idx)) =>
           val replyTo = sender()
@@ -384,7 +401,8 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   }
 
   private def interpret[T](r: Request[T], environment: Environment, program: Program[T]): Unit = {
-    interpretStep(NextStep(r, environment, f => f(), IndexPostActions.empty, program.run(environment, state.underlying).run))
+    val z = program.run(environment, state.underlying).resume.run
+    interpretStep(NextStep(r, environment, f => f(), IndexPostActions.empty, program.run(environment, state.underlying).resume.run))
   }
 
   private def processNextStep: Receive = {

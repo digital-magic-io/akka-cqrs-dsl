@@ -56,24 +56,29 @@ trait IndexExample extends EventSourcedPrograms {
   }
 
   val a1 = new ApiHelper[index1Api.IndexApiType, Index#Algebra, Program] with index1Api.UpdateApi[Index#Algebra, Program]
+  val al1 = new ApiHelper[index1Api.LocalQueryType, Index#LocalAlgebra, Program] with index1Api.LocalApi[Index#LocalAlgebra, Program]
   val a2 = new ApiHelper[index2Api.IndexApiType, Index#Algebra, Program] with index2Api.UpdateApi[Index#Algebra, Program]
 
   def acquire(fail: Boolean): Program[Unit] = for {
-    _ <- a1.acquire("abc")
-    _ <- a2.acquire("abc")
-    _ <- a1.acquire("def")
-    _ <- a2.acquire("def")
-    _ <- a1.acquire("ghi")
-    _ <- { if (fail) throw new RuntimeException(); a2.acquire("ghi") }
+    _  <- a1.acquire("abc")
+    _  <- a2.acquire("abc")
+    _  <- a1.acquire("def")
+    _  <- a2.acquire("def")
+    _  <- a1.acquire("ghi")
+    _  <- { if (fail) throw new RuntimeException(); a2.acquire("ghi") }
+    my <- al1.getMyEntries
+    _  <- unlessM(my.contains("abc"))(raiseError(InternalError(new RuntimeException("did not contain 'abc'"))))
   } yield ()
 
   val release: Program[Unit] = for {
-    _ <- a1.release("abc")
-    _ <- a2.release("abc")
-    _ <- a1.release("def")
-    _ <- a2.release("def")
-    _ <- a1.release("ghi")
-    _ <- a2.release("ghi")
+    _  <- a1.release("abc")
+    _  <- a2.release("abc")
+    _  <- a1.release("def")
+    _  <- a2.release("def")
+    _  <- a1.release("ghi")
+    _  <- a2.release("ghi")
+    my <- al1.getMyEntries
+    _  <- whenM(my.contains("abc"))(raiseError(InternalError(new RuntimeException("did not contain 'abc'"))))
   } yield ()
 
   def genericCommand(actions: List[Action]): Program[Unit] = for {
@@ -123,6 +128,7 @@ case class IndexExampleActor(name: String, entityId: String)(implicit I1: Unique
   override def interpreter: QueryAlgebra ~> LazyFuture = CopK.NaturalTransformation.summon[QueryAlgebra, LazyFuture]
   override def indexInterpreter: Index#Algebra ~> IndexFuture = CopK.NaturalTransformation.summon[Index#Algebra, IndexFuture]
   override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, ?] = CopK.NaturalTransformation.summon[Index#ClientAlgebra, Const[Unit, ?]]
+  override def localApiInterpreter: Index#LocalAlgebra ~> Id = CopK.NaturalTransformation.summon[Index#LocalAlgebra, Id]
   override def clientEventInterpreter: ClientEventInterpreter = implicitly
 
   override def persistenceId = s"${context.system.name}.IndexExample.v1.$name.$entityId"

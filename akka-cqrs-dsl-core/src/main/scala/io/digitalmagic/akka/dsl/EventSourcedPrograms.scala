@@ -30,6 +30,7 @@ trait EventSourcedPrograms extends EventSourced {
   val environmentReaderMonad: MonadReader[Program, Environment]
   val eventWriterMonad: MonadTell[Program, Events]
   val stateMonad: MonadState[Program, State]
+  val localIndexQueryMonad: MonadFree[Program, Coyoneda[Index#LocalAlgebra, ?]]
   val errorMonad: MonadError[Program, ResponseError]
   val freeMonad: MonadFree[Program, Coyoneda[QueryAlgebra, ?]]
   val indexFreeMonad: MonadFree[Program, Coyoneda[Index#Algebra, ?]]
@@ -41,6 +42,10 @@ trait EventSourcedPrograms extends EventSourced {
 
   implicit val indexAlgebraNat: Index#Algebra ~> Program = Lambda[Index#Algebra ~> Program] {
     fa => indexFreeMonad.liftF(Coyoneda.lift(fa))
+  }
+
+  implicit val localAlgebraNat: Index#LocalAlgebra ~> Program = Lambda[Index#LocalAlgebra ~> Program] {
+    fa => localIndexQueryMonad.liftF(Coyoneda.lift(fa))
   }
 
   @inline def pure[A](v: A): Program[A] = programMonad.pure(v)

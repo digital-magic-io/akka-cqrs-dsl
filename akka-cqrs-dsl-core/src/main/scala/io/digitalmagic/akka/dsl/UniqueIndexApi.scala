@@ -18,6 +18,7 @@ object UniqueIndexApi {
   type ClientEventAux[E, I <: UniqueIndexApi, T] = I { type EntityIdType = E; type ClientEventType = T }
   type IndexApiAux[E, I <: UniqueIndexApi, T[_]] = I { type EntityIdType = E; type IndexApiType[X] = T[X] }
   type ClientQueryAux[E, I <: UniqueIndexApi, T[_]] = I { type EntityIdType = E; type ClientQueryType[X] = T[X] }
+  type LocalApiAux[E, I <: UniqueIndexApi, T[_]] = I { type EntityIdType = E; type LocalQueryType[X] = T[X] }
 
   import scala.reflect.runtime.universe.Mirror
   def getApiIdFor(api: UniqueIndexApi)(implicit mirror: Mirror): String = mirror.reflect(api).symbol.fullName
@@ -28,6 +29,7 @@ object UniqueIndexApi {
     private[UniqueIndexApi] def this() = this(0, null, null) // we need this constructor for java serialization
     def this()(implicit E: StringRepresentable[E], K: StringRepresentable[K]) = this(0, E, K)
     type ClientQueryType[T] = ClientQuery[T]
+    type LocalQueryType[T] = LocalQuery[T]
     type KeyType = K
     type IndexApiType[T] = IndexApi[T]
     type EntityIdType = E
@@ -68,7 +70,7 @@ trait UniqueIndexApi {
 
   import UniqueIndexApi._
 
-  sealed trait ApiAsset {
+  trait ApiAsset {
     implicit val Api: Self.type = Self
   }
 
@@ -99,6 +101,10 @@ trait UniqueIndexApi {
 
   case class ClientIndexesState(map: Map[KeyType, ClientIndexState] = Map.empty) extends ApiAsset {
     def reflect: Api.ClientIndexesState = this
+    def acquiredKeys: Set[KeyType] = map.collect {
+      case (key, AcquisitionPendingClientState()) => key
+      case (key, AcquiredClientState()) => key
+    }.toSet
     def get(k: KeyType): Option[ClientIndexState] = map.get(k)
     def +(kv: (KeyType, ClientIndexState)): ClientIndexesState = ClientIndexesState(map + kv)
     def -(k: KeyType): ClientIndexesState = ClientIndexesState(map - k)
@@ -167,6 +173,15 @@ trait UniqueIndexApi {
     def isIndexNeeded(entityId: EntityIdType, key: KeyType): Program[IsIndexNeededResponse] = IsIndexNeeded(entityId, key)
   }
 
+  type LocalQueryType[T] >: LocalQuery[T] <: LocalQuery[T]
+  sealed abstract class LocalQuery[T]
+  case object GetMyEntries extends LocalQuery[Set[KeyType]]
+
+  trait LocalApi[Alg[A] <: CopK[_, A], Program[_]] {
+    this: ApiHelper[LocalQuery, Alg, Program] =>
+    def getMyEntries: Program[Set[KeyType]] = GetMyEntries
+  }
+
   def clientQueryRuntimeInject[Alg[A] <: CopK[_, A]](implicit I: CopK.Inject[ClientQueryType, Alg]): UniqueIndexApi#ClientQueryType ~> Lambda[a => Option[Alg[a]]] =
     Lambda[UniqueIndexApi#ClientQuery ~> Lambda[a => Option[Alg[a]]]] {
       case c: ClientQuery[_] => Some(I(c))
@@ -209,16 +224,18 @@ trait UniqueIndexApi {
   }
 }
 
-trait UniqueIndexInterface[I <: UniqueIndexApi] {
-  def queryApiInterpreter(api: I): api.UniqueIndexQuery ~> LazyFuture
+trait IndexInterface[I <: UniqueIndexApi] {
   def clientApiInterpreter(api: I): api.ClientQuery ~> LazyFuture
   def lowLevelApi(api: I): api.LowLevelApi
 }
 
-case class ActorBasedUniqueIndex[I <: UniqueIndexApi](entityActor: ActorSelection, indexActor: ActorSelection) extends UniqueIndexInterface[I] {
-  override def queryApiInterpreter(api: I): api.UniqueIndexQuery ~> LazyFuture = Lambda[api.UniqueIndexQuery ~> LazyFuture] {
-    case q: api.GetEntityId => indexActor query q
-  }
+trait UniqueIndexInterface[I <: UniqueIndexApi] extends IndexInterface[I] {
+  def queryApiInterpreter(api: I): api.UniqueIndexQuery ~> LazyFuture
+}
+
+trait ActorBasedIndex[I <: UniqueIndexApi] extends IndexInterface[I] {
+  val entityActor: ActorSelection
+  val indexActor: ActorSelection
 
   override def clientApiInterpreter(api: I): api.ClientQuery ~> LazyFuture = Lambda[api.ClientQuery ~> LazyFuture] {
     case q: api.IsIndexNeeded => entityActor query q
@@ -231,5 +248,11 @@ case class ActorBasedUniqueIndex[I <: UniqueIndexApi](entityActor: ActorSelectio
     override def startRelease(entityId: api.EntityIdType, key: api.KeyType): LazyFuture[Unit] = indexActor.command(api.StartRelease(entityId, key))
     override def commitRelease(entityId: api.EntityIdType, key: api.KeyType): Unit = indexActor.tell(api.CommitRelease(entityId, key), ActorRef.noSender)
     override def rollbackRelease(entityId: api.EntityIdType, key: api.KeyType): Unit = indexActor.tell(api.RollbackRelease(entityId, key), ActorRef.noSender)
+  }
+}
+
+case class ActorBasedUniqueIndex[I <: UniqueIndexApi](entityActor: ActorSelection, indexActor: ActorSelection) extends ActorBasedIndex[I] with UniqueIndexInterface[I] {
+  override def queryApiInterpreter(api: I): api.UniqueIndexQuery ~> LazyFuture = Lambda[api.UniqueIndexQuery ~> LazyFuture] {
+    case q: api.GetEntityId => indexActor query q
   }
 }
