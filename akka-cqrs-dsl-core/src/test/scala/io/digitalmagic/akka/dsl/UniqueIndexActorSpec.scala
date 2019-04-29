@@ -174,6 +174,7 @@ class UniqueIndexActorSpec(system: ActorSystem) extends TestKit(system) with Imp
       val res = for {
         _ <- indexActor command StartAcquisition(entityId1, key)
         _ <- indexActor command StartAcquisition(entityId2, key)
+        _ <- indexActor command CommitAcquisition(entityId2, key)
       } yield ()
 
       Await.result(res, 3 seconds)
@@ -326,6 +327,7 @@ class UniqueIndexActorSpec(system: ActorSystem) extends TestKit(system) with Imp
         _ <- indexActor command CommitAcquisition(entityId1, key)
         _ <- indexActor command StartRelease(entityId1, key)
         _ <- indexActor command StartAcquisition(entityId2, key)
+        _ <- indexActor command CommitAcquisition(entityId2, key)
       } yield ()
 
       Await.result(res, 3 seconds)
