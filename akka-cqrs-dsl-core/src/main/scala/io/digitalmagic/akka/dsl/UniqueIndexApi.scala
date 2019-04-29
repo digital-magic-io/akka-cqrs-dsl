@@ -215,7 +215,7 @@ trait UniqueIndexApi {
     override def empty: UniqueIndexServerState = FreeServerState()
     override def process(state: UniqueIndexServerState, event: ServerEvent): UniqueIndexServerState = (state, event) match {
       case (FreeServerState(),                AcquisitionStartedServerEvent(entityId)) => UnconfirmedServerState(entityId)
-      case (UnconfirmedServerState(_),        AcquisitionStartedServerEvent(entityId)) => AcquiredServerState(entityId)
+      case (UnconfirmedServerState(_),        AcquisitionStartedServerEvent(entityId)) => UnconfirmedServerState(entityId)
       case (UnconfirmedServerState(entityId), AcquisitionCompletedServerEvent())       => AcquiredServerState(entityId)
       case (UnconfirmedServerState(_),        ReleaseCompletedServerEvent())           => FreeServerState()
       case (AcquiredServerState(entityId),    ReleaseStartedServerEvent())             => UnconfirmedServerState(entityId)
