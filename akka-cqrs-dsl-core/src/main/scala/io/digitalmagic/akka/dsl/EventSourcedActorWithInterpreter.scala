@@ -1,6 +1,6 @@
 package io.digitalmagic.akka.dsl
 
-import akka.actor.{NoSerializationVerificationNeeded, PoisonPill, ReceiveTimeout}
+import akka.actor.{NoSerializationVerificationNeeded, ReceiveTimeout}
 import akka.cluster.sharding.ShardRegion.Passivate
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotMetadata, SnapshotOffer}
 import io.digitalmagic.akka.dsl.API._
@@ -150,7 +150,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   private def checkAndPassivate(): Unit = {
     if (needsPassivation && !stashingBehaviourActive) {
       logger.debug(s"$persistenceId: stopped...")
-      context.parent ! PoisonPill
+      context.stop(self)
     } else if (needsPassivation) {
       logger.debug(s"$persistenceId: not stopping, program is being executed")
     }
