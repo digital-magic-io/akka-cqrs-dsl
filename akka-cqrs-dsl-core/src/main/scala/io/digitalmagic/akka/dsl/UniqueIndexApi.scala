@@ -6,6 +6,7 @@ import akka.actor.{ActorRef, ActorSelection}
 import io.digitalmagic.akka.dsl.API._
 import iotaz.{Cop, CopK}
 import scalaz._
+import scalaz.Scalaz._
 
 object UniqueIndexApi {
   sealed trait IsIndexNeededResponse
@@ -113,26 +114,38 @@ trait UniqueIndexApi {
 
   type IndexApiType[T] >: IndexApi[T] <: IndexApi[T]
   sealed trait IndexApi[T]
-  case class Acquire(key: KeyType) extends IndexApi[Unit]
-  case class Release(key: KeyType) extends IndexApi[Unit]
+  case class Acquire(keys: Set[KeyType]) extends IndexApi[Unit]
+  case class Release(keys: Set[KeyType]) extends IndexApi[Unit]
   def castIndexApi[T](v: IndexApiType[T]): IndexApi[T] = v
 
   sealed abstract class Error extends ResponseError with ApiAsset {
     def reflect: Api.Error = this
   }
-  case class DuplicateIndex(occupyingEntityId: EntityIdType, key: KeyType) extends Error
+  case class DuplicateIndex(occupyingEntityId: EntityIdType, key: KeyType) extends Error {
+    override def getMessage: String = s"${Api}.DuplicateIndex(${occupyingEntityId}, ${key})"
+  }
   sealed trait BadRequest extends Error
-  case class IndexIsFree(entityId: EntityIdType, key: KeyType) extends BadRequest
-  case class IndexIsAcquired(entityId: EntityIdType, key: KeyType) extends BadRequest
-  case class EntityIdMismatch(occupyingEntityId: EntityIdType, requestedEntityId: EntityIdType, key: KeyType) extends BadRequest
+  case class IndexIsFree(entityId: EntityIdType, key: KeyType) extends BadRequest {
+    override def getMessage: String = s"${Api}.IndexIsFree(${entityId}, ${key})"
+  }
+  case class IndexIsAcquired(entityId: EntityIdType, key: KeyType) extends BadRequest {
+    override def getMessage: String = s"${Api}.IndexIsAcquired(${entityId}, ${key})"
+  }
+  case class EntityIdMismatch(occupyingEntityId: EntityIdType, requestedEntityId: EntityIdType, key: KeyType) extends BadRequest {
+    override def getMessage: String = s"${Api}.EntityIdMismatch(${occupyingEntityId}, ${requestedEntityId}, ${key})"
+  }
 
   sealed abstract class UniqueIndexRequest[T] extends Request[T] with ApiAsset {
-    def key: KeyType
     def reflect: Api.UniqueIndexRequest[T] = this
   }
+  sealed trait ConcreteUniqueIndexRequest[T] extends UniqueIndexRequest[T] {
+    def key: KeyType
+  }
   sealed abstract class UniqueIndexQuery[T] extends UniqueIndexRequest[T] with Query[T]
-  case class GetEntityId(key: KeyType) extends UniqueIndexQuery[Option[EntityIdType]]
-  sealed abstract class UniqueIndexCommand[T] extends UniqueIndexRequest[T] with Command[T]
+  sealed abstract class ConcreteUniqueIndexQuery[T] extends UniqueIndexQuery[T] with ConcreteUniqueIndexRequest[T] with Query[T]
+  case class GetEntityId(key: KeyType) extends ConcreteUniqueIndexQuery[Option[EntityIdType]]
+  case class GetEntityIds(keys: Set[KeyType]) extends UniqueIndexQuery[Map[KeyType, EntityIdType]]
+  sealed abstract class UniqueIndexCommand[T] extends ConcreteUniqueIndexRequest[T] with Command[T]
   case class StartAcquisition(entityId: EntityIdType, key: KeyType) extends UniqueIndexCommand[Unit]
   case class CommitAcquisition(entityId: EntityIdType, key: KeyType) extends UniqueIndexCommand[Unit]
   case class RollbackAcquisition(entityId: EntityIdType, key: KeyType) extends UniqueIndexCommand[Unit]
@@ -143,12 +156,15 @@ trait UniqueIndexApi {
   trait QueryApi[Alg[A] <: CopK[_, A], Program[_]] {
     this: ApiHelper[UniqueIndexQuery, Alg, Program] =>
     def getEntityId(key: KeyType): Program[Option[EntityIdType]] = GetEntityId(key)
+    def getEntityIds(keys: Set[KeyType]): Program[Map[KeyType, EntityIdType]] = GetEntityIds(keys)
   }
 
   trait UpdateApi[Alg[A] <: CopK[_, A], Program[_]] {
     this: ApiHelper[IndexApiType, Alg, Program] =>
-    def acquire(key: KeyType): Program[Unit] = Acquire(key)
-    def release(key: KeyType): Program[Unit] = Release(key)
+    def acquire(key: KeyType): Program[Unit] = Acquire(Set(key))
+    def acquire(keys: Set[KeyType]): Program[Unit] = Acquire(keys)
+    def release(key: KeyType): Program[Unit] = Release(Set(key))
+    def release(keys: Set[KeyType]): Program[Unit] = Release(keys)
   }
 
   trait LowLevelApi {
@@ -254,5 +270,6 @@ trait ActorBasedIndex[I <: UniqueIndexApi] extends IndexInterface[I] {
 case class ActorBasedUniqueIndex[I <: UniqueIndexApi](entityActor: ActorSelection, indexActor: ActorSelection) extends ActorBasedIndex[I] with UniqueIndexInterface[I] {
   override def queryApiInterpreter(api: I): api.UniqueIndexQuery ~> LazyFuture = Lambda[api.UniqueIndexQuery ~> LazyFuture] {
     case q: api.GetEntityId => indexActor query q
+    case api.GetEntityIds(keys) => keys.toList.traverse(k => indexActor.query(api.GetEntityId(k)).asFuture.map ((k, _))).map(_.collect{ case (k, Some(v)) => (k, v) }.toMap)
   }
 }

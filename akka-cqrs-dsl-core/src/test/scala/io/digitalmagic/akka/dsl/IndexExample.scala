@@ -2,7 +2,9 @@ package io.digitalmagic.akka.dsl
 
 import akka.actor.Props
 import akka.cluster.sharding.ShardRegion.{ExtractEntityId, ExtractShardId}
+import io.digitalmagic.akka.dsl
 import io.digitalmagic.akka.dsl.API._
+import iotaz.TListK.:::
 import iotaz.{CopK, TNilK}
 import scalaz.Scalaz._
 import scalaz._
@@ -27,6 +29,10 @@ object IndexExample {
   case class ReleaseCommand(entityId: String) extends Command[Unit]
   case class GenericCommand(entityId: String, actions: List[Action]) extends Command[Unit]
 
+  case class AcquireBatchCommand(entityId: String) extends Command[Unit]
+  case class ReleaseBatchCommand(entityId: String) extends Command[Unit]
+  case class GetBatchQuery(entityId: String) extends Query[Map[String, String]]
+
   @SerialVersionUID(1)
   implicit case object index1Api extends UniqueIndexApi.Base[String, String]
   @SerialVersionUID(1)
@@ -40,7 +46,7 @@ trait IndexExample extends EventSourcedPrograms {
   override type EntityIdType = String
 
   override type Environment = Unit
-  override type QueryAlgebra[A] = CopK[TNilK, A]
+  override type QueryAlgebra[A] = CopK[index1Api.UniqueIndexQuery ::: TNilK, A]
   override val algebraIsQuery: IsQuery[QueryAlgebra] = implicitly
 
   type Index = EmptyIndexList# + [index1Api.type]# + [index2Api.type]
@@ -57,6 +63,7 @@ trait IndexExample extends EventSourcedPrograms {
 
   val a1 = new ApiHelper[index1Api.IndexApiType, Index#Algebra, Program] with index1Api.UpdateApi[Index#Algebra, Program]
   val al1 = new ApiHelper[index1Api.LocalQueryType, Index#LocalAlgebra, Program] with index1Api.LocalApi[Index#LocalAlgebra, Program]
+  val aq1 = new ApiHelper[index1Api.UniqueIndexQuery, QueryAlgebra, Program] with index1Api.QueryApi[QueryAlgebra, Program]
   val a2 = new ApiHelper[index2Api.IndexApiType, Index#Algebra, Program] with index2Api.UpdateApi[Index#Algebra, Program]
 
   def acquire(fail: Boolean): Program[Unit] = for {
@@ -81,6 +88,18 @@ trait IndexExample extends EventSourcedPrograms {
     _  <- whenM(my.contains("abc"))(raiseError(InternalError(new RuntimeException("did not contain 'abc'"))))
   } yield ()
 
+  val acquireBatch: Program[Unit] = for {
+    _ <- a1.acquire(Set("abc", "def"))
+    _ <- a2.acquire(Set("abc", "def"))
+  } yield ()
+
+  val releaseBatch: Program[Unit] = for {
+    _ <- a1.release(Set("abc", "def"))
+    _ <- a2.release(Set("abc", "def"))
+  } yield ()
+
+  val getBatch: Program[Map[String, String]] = aq1.getEntityIds(Set("abc", "def"))
+
   def genericCommand(actions: List[Action]): Program[Unit] = for {
     _ <- actions.reverse.foldMapM {
       case AcquireAction(key) => a1.acquire(key)
@@ -100,6 +119,9 @@ trait IndexExample extends EventSourcedPrograms {
     case AcquireCommand(_, fail) => Some(acquire(fail))
     case ReleaseCommand(_) => Some(release)
     case GenericCommand(_, actions) => Some(genericCommand(actions))
+    case AcquireBatchCommand(_) => Some(acquireBatch)
+    case ReleaseBatchCommand(_) => Some(releaseBatch)
+    case GetBatchQuery(_) => Some(getBatch)
     case _ => None
   }
 }
@@ -110,6 +132,9 @@ object IndexExampleActor {
     case msg: IndexExample.AcquireCommand => (msg.entityId, msg)
     case msg: IndexExample.ReleaseCommand => (msg.entityId, msg)
     case msg: IndexExample.GenericCommand => (msg.entityId, msg)
+    case msg: IndexExample.AcquireBatchCommand => (msg.entityId, msg)
+    case msg: IndexExample.ReleaseBatchCommand => (msg.entityId, msg)
+    case msg: IndexExample.GetBatchQuery => (msg.entityId, msg)
   }
 
   def extractShardId: ExtractShardId = {
@@ -125,6 +150,7 @@ case class IndexExampleActor(name: String, entityId: String)(implicit I1: Unique
 
   context.setReceiveTimeout(1 seconds)
 
+  implicit val index1QueryApi = I1.queryApiInterpreter(index1Api)
   override def interpreter: QueryAlgebra ~> LazyFuture = CopK.NaturalTransformation.summon[QueryAlgebra, LazyFuture]
   override def indexInterpreter: Index#Algebra ~> IndexFuture = CopK.NaturalTransformation.summon[Index#Algebra, IndexFuture]
   override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, ?] = CopK.NaturalTransformation.summon[Index#ClientAlgebra, Const[Unit, ?]]

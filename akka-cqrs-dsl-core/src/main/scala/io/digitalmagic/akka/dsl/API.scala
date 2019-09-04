@@ -15,7 +15,9 @@ object API {
 
   trait ResponseError extends Throwable
   case object NotFound extends ResponseError
-  case class InternalError(cause: Throwable) extends ResponseError
+  case class InternalError(cause: Throwable) extends ResponseError {
+    override def getMessage: String = s"InternalError(${cause})"
+  }
 
   type Result[T] = Either[ResponseError, T]
 

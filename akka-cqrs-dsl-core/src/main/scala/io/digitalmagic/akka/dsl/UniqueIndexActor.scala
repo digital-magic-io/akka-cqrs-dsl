@@ -138,7 +138,7 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
     }
   } yield ()
 
-  def requestToProgram: UniqueIndexRequest ~> Program  = Lambda[UniqueIndexRequest ~> Program] {
+  def requestToProgram: ConcreteUniqueIndexRequest ~> Program  = Lambda[ConcreteUniqueIndexRequest ~> Program] {
     case GetEntityId(key) => getEntityId(key)
     case StartAcquisition(entityId, key) => startAcquisition(entityId, key)
     case CommitAcquisition(entityId, _) => commitAcquisition(entityId)
@@ -159,14 +159,14 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
   }
 
   override def getProgram: Request ~> MaybeProgram = Lambda[Request ~> MaybeProgram] {
-    case r: UniqueIndexRequest[_] => Some(requestToProgram(r))
+    case r: ConcreteUniqueIndexRequest[_] => Some(requestToProgram(r))
     case _ => None
   }
 }
 
 case class UniqueIndexActorDef[I <: UniqueIndexApi](indexApi: I, name: String, passivateIn: FiniteDuration = 5 seconds, numberOfShards: Int = 100)(implicit I: UniqueIndexInterface[I]) {
   def extractEntityId: ExtractEntityId = {
-    case msg: indexApi.UniqueIndexRequest[_] => (indexApi.keyToString.asString(msg.key), msg)
+    case msg: indexApi.ConcreteUniqueIndexRequest[_] => (indexApi.keyToString.asString(msg.key), msg)
   }
 
   def extractShardId: ExtractShardId = {

@@ -266,6 +266,49 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
       Await.result(index1.indexActor query index1Api.GetEntityId("abc") map identity, 3 seconds) shouldBe None
      }
 
+    "support batch unique index operations" in {
+      import IndexExample._
+
+      implicit val index1 = new ActorBasedUniqueIndex[index1Api.type](system.actorSelection("system/sharding/example-batch"), system.actorSelection("system/sharding/index1-batch"))
+      implicit val index2 = new ActorBasedUniqueIndex[index2Api.type](system.actorSelection("system/sharding/example-batch"), system.actorSelection("system/sharding/index2-batch"))
+
+      val clusterSharding = ClusterSharding(system)
+      val clusterShardingSettings = ClusterShardingSettings(system)
+      val shardAllocationStrategy = clusterSharding.defaultShardAllocationStrategy(clusterShardingSettings)
+
+      UniqueIndexActorDef(index1Api, "index1-batch").start(clusterSharding, clusterShardingSettings)
+      UniqueIndexActorDef(index2Api, "index2-batch").start(clusterSharding, clusterShardingSettings)
+
+      clusterSharding.startProperly(
+        typeName = "example-batch",
+        entityIdToEntityProps = IndexExampleActor.props("example-batch", _),
+        settings = clusterShardingSettings,
+        extractEntityId = IndexExampleActor.extractEntityId,
+        extractShardId = IndexExampleActor.extractShardId,
+        allocationStrategy = shardAllocationStrategy,
+        handOffStopMessage = EventSourcedActorWithInterpreter.Stop
+      )
+
+      {
+        val resp = index1.entityActor command IndexExample.AcquireBatchCommand("e1") map identity
+        Await.result(resp, 3 seconds) shouldBe (())
+      }
+
+      val entityId = {
+        val resp = index1.entityActor query IndexExample.GetBatchQuery("e1") map identity
+        val optionEntityId = Await.result(resp, 3 seconds)
+        optionEntityId shouldBe Map("abc" -> "e1", "def" -> "e1")
+        optionEntityId("abc")
+      }
+
+      {
+        val resp = index1.entityActor command IndexExample.ReleaseBatchCommand(entityId) map identity
+        Await.result(resp, 3 seconds) shouldBe (())
+      }
+
+      Await.result(index1.entityActor query IndexExample.GetBatchQuery(entityId) map identity, 3 seconds) shouldBe Map.empty
+     }
+
     "correctly handle acquire-release and release-acquire command sequences" in {
       import IndexExample._
 

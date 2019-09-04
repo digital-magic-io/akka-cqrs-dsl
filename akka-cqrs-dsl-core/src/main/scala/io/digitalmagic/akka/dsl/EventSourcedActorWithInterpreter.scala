@@ -2,13 +2,13 @@ package io.digitalmagic.akka.dsl
 
 import akka.actor.{NoSerializationVerificationNeeded, ReceiveTimeout}
 import akka.cluster.sharding.ShardRegion.Passivate
+import akka.event.{Logging, LoggingAdapter}
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotMetadata, SnapshotOffer}
 import io.digitalmagic.akka.dsl.API._
-import scalaz._
-import scalaz.Tags._
-import Scalaz._
-import akka.event.{Logging, LoggingAdapter}
 import iotaz.{TList, evidence}
+import scalaz._
+import scalaz.Scalaz._
+import scalaz.Tags._
 
 import scala.collection.immutable
 import scala.concurrent.{Future, Promise}
@@ -270,50 +270,54 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
                                                          A: IndexInterface[I]): T ~> IndexFuture = new (T ~> IndexFuture) {
 
     override def apply[A](fa: T[A]): IndexFuture[A] = api.castIndexApi(fa) match {
-      case api.Acquire(key) =>
-        state.indexesState.get(api).flatMap(_.get(key)) match {
-          case None | Some(api.AcquisitionPendingClientState()) =>
-            // not yet acquired
-            // or acquisition has been started, in this case re-acquire because previous attempt could fail with duplicate key, but that has not been reflected in our state
-            val p = Promise[IndexResult[Unit]]
-            persist(api.AcquisitionStartedClientEvent(key)) { event =>
-              processIndexEvent(event)
-              A.lowLevelApi(api).startAcquisition(entityId, key)(dispatcher) onComplete {
-                case TrySuccess(result) => p.success((
-                  f => f(),
-                  IndexPostActions.commitAcquisition(api)(entityId, key),
-                  result
-                ))
-                case TryFailure(cause) => p.failure(cause)
-              }
-            }
-            p.future
-          case Some(api.ReleasePendingClientState()) => // release has been started, so roll it back
-            Future.successful((f => f(), IndexPostActions.rollbackRelease(api)(entityId, key), ()))
-          case Some(api.AcquiredClientState()) => // already acquired
-            Future.successful((f => f(), IndexPostActions.empty, ()))
+      case api.Acquire(keys) =>
+        val (events, indexPostActions) = keys.toList.foldMap {
+          key => state.indexesState.get(api).flatMap(_.get(key)) match {
+            case None | Some(api.AcquisitionPendingClientState()) =>
+              // not yet acquired
+              // or acquisition has been started, in this case re-acquire because previous attempt could fail with duplicate key, but that has not been reflected in our state
+              (List(api.AcquisitionStartedClientEvent(key)), IndexPostActions.commitAcquisition(api)(entityId, key))
+            case Some(api.ReleasePendingClientState()) =>
+              // release has been started, so roll it back
+              (List(), IndexPostActions.rollbackRelease(api)(entityId, key))
+            case Some(api.AcquiredClientState()) =>
+              // already acquired
+              (List(), IndexPostActions.empty)
+          }
         }
-      case api.Release(key) =>
-        state.indexesState.get(api).flatMap(_.get(key)) match {
-          case None => // not yet acquired
-            Future.successful((f => f(), IndexPostActions.empty, ()))
-          case Some(api.AcquisitionPendingClientState()) => // acquisition has been started, so roll it back
-            Future.successful((f => f(), IndexPostActions.rollbackAcquisition(api)(entityId, key), ()))
-          case Some(api.ReleasePendingClientState()) => // release has been started
-            Future.successful((f => f(), IndexPostActions.commitRelease(api)(entityId, key), ()))
-          case Some(api.AcquiredClientState()) => // already acquired
-            A.lowLevelApi(api).startRelease(entityId, key)(dispatcher) map { result =>
-              (
-                f => {
-                  persist(api.ReleaseStartedClientEvent(key)) { event =>
-                    processIndexEvent(event)
-                    f()
-                  }
-                },
-                IndexPostActions.commitRelease(api)(entityId, key),
-                result
-              )
+        val p = Promise[IndexResult[Unit]]
+        persistEvents(events)(
+          handler = { event =>
+            processIndexEvent(event)
+          },
+          completion = { _ =>
+            events.traverse(e => A.lowLevelApi(api).startAcquisition(entityId, e.key)(dispatcher)) onComplete {
+              case TrySuccess(_) => p.success((f => f(), indexPostActions, ()))
+              case TryFailure(cause) => p.failure(cause)
             }
+          }
+        )
+        p.future
+      case api.Release(keys) =>
+        val (events, indexPostActions) = keys.toList.foldMap {
+          key => state.indexesState.get(api).flatMap(_.get(key)) match {
+            case None => // not yet acquired
+              (List(), IndexPostActions.empty)
+            case Some(api.AcquisitionPendingClientState()) => // acquisition has been started, so roll it back
+              (List(), IndexPostActions.rollbackAcquisition(api)(entityId, key))
+            case Some(api.ReleasePendingClientState()) => // release has been started
+              (List(), IndexPostActions.commitRelease(api)(entityId, key))
+            case Some(api.AcquiredClientState()) => // already acquired
+              (List(api.ReleaseStartedClientEvent(key)), IndexPostActions.commitRelease(api)(entityId, key))
+          }
+        }
+        events.traverse(e => A.lowLevelApi(api).startRelease(entityId, e.key)(dispatcher)) map { _ =>
+          ((f: () => Unit) => {
+            persistEvents(events)(
+              handler = { event => processIndexEvent(event) },
+              completion = { _ => f() }
+            )
+          }, indexPostActions, ())
         }
     }
   }

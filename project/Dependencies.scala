@@ -7,7 +7,6 @@ object Dependencies {
     val scala212                = "2.12.8"
     val scalaz                  = "7.2.27"
     val iotaz                   = "0.3.10"
-    val simulacrum              = "0.14.0"
     val sparyJson               = "1.3.5"
     val kryoVersion             = "4.0.2"
     val akka                    = "2.5.19"
