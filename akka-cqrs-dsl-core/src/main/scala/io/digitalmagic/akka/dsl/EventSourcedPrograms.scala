@@ -30,10 +30,10 @@ trait EventSourcedPrograms extends EventSourced {
   val environmentReaderMonad: MonadReader[Program, Environment]
   val eventWriterMonad: MonadTell[Program, Events]
   val stateMonad: MonadState[Program, State]
-  val localIndexQueryMonad: MonadFree[Program, Coyoneda[Index#LocalAlgebra, ?]]
+  val localIndexQueryMonad: MonadFree[Program, Coyoneda[Index#LocalAlgebra, *]]
   val errorMonad: MonadError[Program, ResponseError]
-  val freeMonad: MonadFree[Program, Coyoneda[QueryAlgebra, ?]]
-  val indexFreeMonad: MonadFree[Program, Coyoneda[Index#Algebra, ?]]
+  val freeMonad: MonadFree[Program, Coyoneda[QueryAlgebra, *]]
+  val indexFreeMonad: MonadFree[Program, Coyoneda[Index#Algebra, *]]
   val logWriterMonad: MonadTell[Program, Log]
 
   implicit val queryAlgebraNat: QueryAlgebra ~> Program = Lambda[QueryAlgebra ~> Program] {

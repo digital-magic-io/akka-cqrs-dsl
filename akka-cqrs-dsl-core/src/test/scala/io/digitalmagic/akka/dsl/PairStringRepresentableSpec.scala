@@ -4,9 +4,9 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalacheck.Prop.forAll
 import org.scalacheck.Test.Parameters
 import org.scalatest.WordSpecLike
-import org.scalatest.prop.Checkers._
+import org.scalatestplus.scalacheck.Checkers
 
-class PairStringRepresentableSpec extends WordSpecLike {
+class PairStringRepresentableSpec extends WordSpecLike with Checkers {
 
   val asciiStringGen: Gen[String] = Gen.containerOf[Array, Char](Gen.choose[Char](32,127)).map(_.mkString)
   implicit val asciiStringArb: Arbitrary[String] = Arbitrary(asciiStringGen)

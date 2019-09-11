@@ -4,15 +4,15 @@ import sbt.Keys._
 object Dependencies {
 
   object Versions {
-    val scala212                = "2.12.8"
-    val scalaz                  = "7.2.27"
-    val iotaz                   = "0.3.10"
+    val scala212                = "2.12.9"
+    val scalaz                  = "7.2.28"
+    val iotaz                   = "0.3.11"
     val sparyJson               = "1.3.5"
     val kryoVersion             = "4.0.2"
-    val akka                    = "2.5.19"
-    val scalaTest               = "3.0.5"
-    val akkaPersistenceInMemory = "2.5.15.1"
-    val specs2Version           = "4.3.6"
+    val akka                    = "2.5.25"
+    val scalaTest               = "3.0.8"
+    val akkaPersistenceInMemory = "2.5.15.2"
+    val specs2Version           = "4.7.0"
     val scalacheckVersion       = "1.14.0"
     val akkaKryoSerialization   = "0.5.2"
   }
@@ -21,7 +21,7 @@ object Dependencies {
 
   val commonDependencies = Seq(
     "org.scalatest"              %% "scalatest"                 % Versions.scalaTest % Test,
-    compilerPlugin("org.spire-math" % "kind-projector" % "0.9.9" cross CrossVersion.binary)
+    compilerPlugin("org.typelevel" % "kind-projector" % "0.10.3" cross CrossVersion.binary)
   )
 
   val coreDependencies = libraryDependencies ++= commonDependencies ++ Seq(

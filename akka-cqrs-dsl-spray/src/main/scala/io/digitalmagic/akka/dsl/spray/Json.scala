@@ -82,11 +82,12 @@ private object JsonHelper {
     }
 
     override def write(obj: api.ClientIndexState): JsValue = {
-      val typeName = obj match {
+      @inline def getTypeName(api: UniqueIndexApi)(obj: api.ClientIndexState): String = obj match {
         case api.AcquisitionPendingClientState() => AcquisitionPendingClientStateName
         case api.ReleasePendingClientState()     => ReleasePendingClientStateName
         case api.AcquiredClientState()           => AcquiredClientStateName
       }
+      val typeName = getTypeName(api)(obj)
 
       JsObject(
         "type" -> typeName.toJson
@@ -331,8 +332,8 @@ object Json extends DefaultJsonProtocol {
     }
   }
 
-  implicit def uniqueIndexRequestFormat(implicit mirror: Mirror): RootJsonFormat[UniqueIndexApi#UniqueIndexRequest[_]] = new RootJsonFormat[UniqueIndexApi#UniqueIndexRequest[_]] {
-    override def read(json: JsValue): UniqueIndexApi#UniqueIndexRequest[_] = {
+  implicit def uniqueIndexRequestFormat(implicit mirror: Mirror): RootJsonFormat[UniqueIndexApi#ConcreteUniqueIndexRequest[_]] = new RootJsonFormat[UniqueIndexApi#ConcreteUniqueIndexRequest[_]] {
+    override def read(json: JsValue): UniqueIndexApi#ConcreteUniqueIndexRequest[_] = {
       val fields = json.asJsObject.fields
       val value = fields("value")
 
@@ -351,20 +352,22 @@ object Json extends DefaultJsonProtocol {
       }
     }
 
-    override def write(obj: UniqueIndexApi#UniqueIndexRequest[_]): JsValue = {
-      import obj.Api
-      import obj.Api._
-
-      val (requestType, value) = obj.reflect match {
-        case r: GetEntityId         => (GetEntityIdName, r.toJson)
-        case r: StartAcquisition    => (StartAcquisitionName, r.toJson)
-        case r: CommitAcquisition   => (CommitAcquisitionName, r.toJson)
-        case r: RollbackAcquisition => (RollbackAcquisitionName, r.toJson)
-        case r: StartRelease        => (StartReleaseName, r.toJson)
-        case r: CommitRelease       => (CommitReleaseName, r.toJson)
-        case r: RollbackRelease     => (RollbackReleaseName, r.toJson)
+    override def write(obj: UniqueIndexApi#ConcreteUniqueIndexRequest[_]): JsValue = {
+      @inline def getTypeAndJsValue(api: UniqueIndexApi)(obj: api.ConcreteUniqueIndexRequest[_]): (String, JsValue) = {
+        import obj.Api
+        import obj.Api._
+        obj match {
+          case r: GetEntityId         => (GetEntityIdName, r.toJson)
+          case r: StartAcquisition    => (StartAcquisitionName, r.toJson)
+          case r: CommitAcquisition   => (CommitAcquisitionName, r.toJson)
+          case r: RollbackAcquisition => (RollbackAcquisitionName, r.toJson)
+          case r: StartRelease        => (StartReleaseName, r.toJson)
+          case r: CommitRelease       => (CommitReleaseName, r.toJson)
+          case r: RollbackRelease     => (RollbackReleaseName, r.toJson)
+        }
       }
 
+      val (requestType, value) = getTypeAndJsValue(obj.Api)(obj.reflect)
       JsObject(
         "api" -> obj.Api.toJson,
         "type" -> requestType.toJson,

@@ -101,7 +101,7 @@ class Actor1 extends Actor1Programs with EventSourcedActorWithInterpreter {
   // some boiler plate for querying other components and using indexes
   override def interpreter: QueryAlgebra ~> LazyFuture = CopK.NaturalTransformation.summon[QueryAlgebra, LazyFuture]
   override def indexInterpreter: Index#Algebra ~> IndexFuture = CopK.NaturalTransformation.summon[Index#Algebra, IndexFuture]
-  override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, ?] = CopK.NaturalTransformation.summon[Index#ClientAlgebra, Const[Unit, ?]]
+  override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, *] = CopK.NaturalTransformation.summon[Index#ClientAlgebra, Const[Unit, *]]
   override def clientEventInterpreter: ClientEventInterpreter = implicitly
 }
 ```
@@ -233,7 +233,7 @@ case class IndexExampleActor(entityId: String)(implicit I1: UniqueIndexInterface
 
   // construct interpreters of different parts of client side APIs
   override def indexInterpreter: Index#Algebra ~> IndexFuture = CopK.NaturalTransformation.summon[Index#Algebra, IndexFuture]
-  override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, ?] = CopK.NaturalTransformation.summon[Index#ClientAlgebra, Const[Unit, ?]]
+  override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, *] = CopK.NaturalTransformation.summon[Index#ClientAlgebra, Const[Unit, *]]
   override def clientEventInterpreter: ClientEventInterpreter = implicitly
 }
 ```

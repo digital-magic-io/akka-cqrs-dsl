@@ -273,7 +273,7 @@ class ServerStateSerializer(apiSerializer: ApiSerializer) extends Serializer[Uni
   }
 }
 
-class UniqueIndexRequestSerializer(apiSerializer: ApiSerializer) extends Serializer[UniqueIndexApi#UniqueIndexRequest[_]] with Helper {
+class UniqueIndexRequestSerializer(apiSerializer: ApiSerializer) extends Serializer[UniqueIndexApi#ConcreteUniqueIndexRequest[_]] with Helper {
   val GetEntityIdName         = "GetEntityId"
   val StartAcquisitionName    = "StartAcquisition"
   val CommitAcquisitionName   = "CommitAcquisition"
@@ -282,7 +282,7 @@ class UniqueIndexRequestSerializer(apiSerializer: ApiSerializer) extends Seriali
   val CommitReleaseName       = "CommitRelease"
   val RollbackReleaseName     = "RollbackRelease"
 
-  override def write(kryo: Kryo, output: Output, obj: UniqueIndexApi#UniqueIndexRequest[_]): Unit = {
+  override def write(kryo: Kryo, output: Output, obj: UniqueIndexApi#ConcreteUniqueIndexRequest[_]): Unit = {
     import obj.Api._
     kryo.writeObject(output, obj.Api, apiSerializer)
     obj.reflect match {
@@ -316,7 +316,7 @@ class UniqueIndexRequestSerializer(apiSerializer: ApiSerializer) extends Seriali
     }
   }
 
-  override def read(kryo: Kryo, input: Input, `type`: Class[UniqueIndexApi#UniqueIndexRequest[_]]): UniqueIndexApi#UniqueIndexRequest[_] = {
+  override def read(kryo: Kryo, input: Input, `type`: Class[UniqueIndexApi#ConcreteUniqueIndexRequest[_]]): UniqueIndexApi#ConcreteUniqueIndexRequest[_] = {
     val api = kryo.readObject(input, classOf[UniqueIndexApi], apiSerializer)
     import api._
     input.readString() match {

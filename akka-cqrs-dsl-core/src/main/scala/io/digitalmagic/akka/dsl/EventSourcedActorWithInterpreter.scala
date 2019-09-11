@@ -109,22 +109,22 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   val logger: LoggingAdapter = Logging.getLogger(context.system, this)
 
   type Logger[T] = WriterT[Identity, Log, T]
-  type Result[T] = ResponseError \/ ((Events, T, State) \/ Coyoneda[Index#LocalAlgebra, FreeT[Coyoneda[Index#LocalAlgebra,?],EitherT[FreeT[Coyoneda[Index#Algebra,?],FreeT[Coyoneda[QueryAlgebra,?],Logger,?],?],ResponseError,?],(Events, T, State)]])
+  type Result[T] = ResponseError \/ ((Events, T, State) \/ Coyoneda[Index#LocalAlgebra, FreeT[Coyoneda[Index#LocalAlgebra, *],EitherT[FreeT[Coyoneda[Index#Algebra, *],FreeT[Coyoneda[QueryAlgebra, *],Logger, *], *],ResponseError, *],(Events, T, State)]])
 
-  type Program[A] = RWST[FreeT[Coyoneda[Index#LocalAlgebra, ?], EitherT[FreeT[Coyoneda[Index#Algebra, ?], FreeT[Coyoneda[QueryAlgebra, ?], Logger, ?], ?], ResponseError, ?], ?], Environment, Events, State, A]
+  type Program[A] = RWST[FreeT[Coyoneda[Index#LocalAlgebra, *], EitherT[FreeT[Coyoneda[Index#Algebra, *], FreeT[Coyoneda[QueryAlgebra, *], Logger, *], *], ResponseError, *], *], Environment, Events, State, A]
   override lazy val programMonad: Monad[Program] = Monad[Program]
 
-  private type QueryStep[T] = FreeT[Coyoneda[QueryAlgebra, ?], Logger, Result[T] \/ Coyoneda[Index#Algebra, IndexStep[T]]]
-  private type IndexStep[T] = FreeT[Coyoneda[Index#Algebra, ?], FreeT[Coyoneda[QueryAlgebra, ?], Logger, ?], Result[T]]
+  private type QueryStep[T] = FreeT[Coyoneda[QueryAlgebra, *], Logger, Result[T] \/ Coyoneda[Index#Algebra, IndexStep[T]]]
+  private type IndexStep[T] = FreeT[Coyoneda[Index#Algebra, *], FreeT[Coyoneda[QueryAlgebra, *], Logger, *], Result[T]]
   private type StepResult[T] = Identity[(Log, Result[T] \/ Coyoneda[Index#Algebra, IndexStep[T]] \/ Coyoneda[QueryAlgebra, QueryStep[T]])]
 
   override lazy val environmentReaderMonad: MonadReader[Program, Environment] = MonadReader[Program, Environment]
   override lazy val eventWriterMonad: MonadTell[Program, Events] = MonadTell[Program, Events]
   override lazy val stateMonad: MonadState[Program, State] = MonadState[Program, State]
-  override lazy val localIndexQueryMonad: MonadFree[Program, Coyoneda[Index#LocalAlgebra, ?]] = MonadFree[Program, Coyoneda[Index#LocalAlgebra, ?]]
+  override lazy val localIndexQueryMonad: MonadFree[Program, Coyoneda[Index#LocalAlgebra, *]] = MonadFree[Program, Coyoneda[Index#LocalAlgebra, *]]
   override lazy val errorMonad: MonadError[Program, ResponseError] = MonadError[Program, ResponseError]
-  override lazy val freeMonad: MonadFree[Program, Coyoneda[QueryAlgebra, ?]] = MonadFree[Program, Coyoneda[QueryAlgebra, ?]]
-  override lazy val indexFreeMonad: MonadFree[Program, Coyoneda[Index#Algebra, ?]] = MonadFree[Program, Coyoneda[Index#Algebra, ?]]
+  override lazy val freeMonad: MonadFree[Program, Coyoneda[QueryAlgebra, *]] = MonadFree[Program, Coyoneda[QueryAlgebra, *]]
+  override lazy val indexFreeMonad: MonadFree[Program, Coyoneda[Index#Algebra, *]] = MonadFree[Program, Coyoneda[Index#Algebra, *]]
   override lazy val logWriterMonad: MonadTell[Program, Log] = MonadTell[Program, Log]
 
   implicit def unitToConstUnit[A](x: Unit): Const[Unit, A] = Const(x)
@@ -136,11 +136,11 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   def entityId: EntityIdType
   def interpreter: QueryAlgebra ~> LazyFuture
   def indexInterpreter: Index#Algebra ~> IndexFuture
-  def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, ?]
+  def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, *]
   def localApiInterpreter: Index#LocalAlgebra ~> Id
 
   type ClientEventInterpreter = Index#ClientEventAlgebra => ClientIndexesStateMap => ClientIndexesStateMap
-  implicit def genClientEventInterpreter(implicit interpreters: evidence.All[TList.Op.Map[ClientEventInterpreterS[EntityIdType, ?], Index#ClientEventList]]): ClientEventInterpreter =
+  implicit def genClientEventInterpreter(implicit interpreters: evidence.All[TList.Op.Map[ClientEventInterpreterS[EntityIdType, *], Index#ClientEventList]]): ClientEventInterpreter =
     e => s => interpreters.underlying.values(e.index).asInstanceOf[ClientEventInterpreterS[EntityIdType, Any]](e.value, s)
   def clientEventInterpreter: ClientEventInterpreter
 
@@ -411,7 +411,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
       }
   }
 
-  implicit def clientQueryHandler[I <: UniqueIndexApi, T[_]](implicit api: UniqueIndexApi.ClientQueryAux[EntityIdType, I, T]): T ~> Const[Unit, ?] = Lambda[T ~> Const[Unit, ?]] {
+  implicit def clientQueryHandler[I <: UniqueIndexApi, T[_]](implicit api: UniqueIndexApi.ClientQueryAux[EntityIdType, I, T]): T ~> Const[Unit, *] = Lambda[T ~> Const[Unit, *]] {
     case q@api.IsIndexNeeded(entityId, key) if entityId != EventSourcedActorWithInterpreter.this.entityId =>
       logger.warning(s"entity id mismatch: got request [$q], while my entity id is [${EventSourcedActorWithInterpreter.this.entityId}]")
       sender() ! q.failure(api.EntityIdMismatch(EventSourcedActorWithInterpreter.this.entityId, entityId, key))

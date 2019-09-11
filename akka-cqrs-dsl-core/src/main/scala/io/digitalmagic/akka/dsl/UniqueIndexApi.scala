@@ -135,14 +135,15 @@ trait UniqueIndexApi {
     override def getMessage: String = s"${Api}.EntityIdMismatch(${occupyingEntityId}, ${requestedEntityId}, ${key})"
   }
 
-  sealed abstract class UniqueIndexRequest[T] extends Request[T] with ApiAsset {
+  sealed trait UniqueIndexRequest[T] extends Request[T] with ApiAsset {
     def reflect: Api.UniqueIndexRequest[T] = this
   }
-  sealed trait ConcreteUniqueIndexRequest[T] extends UniqueIndexRequest[T] {
+  sealed abstract class ConcreteUniqueIndexRequest[T] extends UniqueIndexRequest[T] with ApiAsset {
     def key: KeyType
+    override def reflect: Api.ConcreteUniqueIndexRequest[T] = this
   }
-  sealed abstract class UniqueIndexQuery[T] extends UniqueIndexRequest[T] with Query[T]
-  sealed abstract class ConcreteUniqueIndexQuery[T] extends UniqueIndexQuery[T] with ConcreteUniqueIndexRequest[T] with Query[T]
+  sealed trait UniqueIndexQuery[T] extends UniqueIndexRequest[T] with Query[T]
+  sealed abstract class ConcreteUniqueIndexQuery[T] extends ConcreteUniqueIndexRequest[T] with UniqueIndexQuery[T]
   case class GetEntityId(key: KeyType) extends ConcreteUniqueIndexQuery[Option[EntityIdType]]
   case class GetEntityIds(keys: Set[KeyType]) extends UniqueIndexQuery[Map[KeyType, EntityIdType]]
   sealed abstract class UniqueIndexCommand[T] extends ConcreteUniqueIndexRequest[T] with Command[T]
@@ -253,8 +254,11 @@ trait ActorBasedIndex[I <: UniqueIndexApi] extends IndexInterface[I] {
   val entityActor: ActorSelection
   val indexActor: ActorSelection
 
-  override def clientApiInterpreter(api: I): api.ClientQuery ~> LazyFuture = Lambda[api.ClientQuery ~> LazyFuture] {
-    case q: api.IsIndexNeeded => entityActor query q
+  override def clientApiInterpreter(api: I): api.ClientQuery ~> LazyFuture = {
+    @inline def impl(api: UniqueIndexApi): api.ClientQuery ~> LazyFuture = Lambda[api.ClientQuery ~> LazyFuture] {
+      case q: api.IsIndexNeeded => entityActor query q
+    }
+    impl(api)
   }
 
   override def lowLevelApi(api: I): api.LowLevelApi = new api.LowLevelApi {
@@ -268,8 +272,11 @@ trait ActorBasedIndex[I <: UniqueIndexApi] extends IndexInterface[I] {
 }
 
 case class ActorBasedUniqueIndex[I <: UniqueIndexApi](entityActor: ActorSelection, indexActor: ActorSelection) extends ActorBasedIndex[I] with UniqueIndexInterface[I] {
-  override def queryApiInterpreter(api: I): api.UniqueIndexQuery ~> LazyFuture = Lambda[api.UniqueIndexQuery ~> LazyFuture] {
-    case q: api.GetEntityId => indexActor query q
-    case api.GetEntityIds(keys) => keys.toList.traverse(k => indexActor.query(api.GetEntityId(k)).asFuture.map ((k, _))).map(_.collect{ case (k, Some(v)) => (k, v) }.toMap)
+  override def queryApiInterpreter(api: I): api.UniqueIndexQuery ~> LazyFuture = {
+    @inline def impl(api: UniqueIndexApi): api.UniqueIndexQuery ~> LazyFuture = Lambda[api.UniqueIndexQuery ~> LazyFuture] {
+      case q: api.GetEntityId => indexActor query q
+      case api.GetEntityIds(keys) => keys.toList.traverse(k => indexActor.query(api.GetEntityId(k)).asFuture.map ((k, _))).map(_.collect{ case (k, Some(v)) => (k, v) }.toMap)
+    }
+    impl(api)
   }
 }
