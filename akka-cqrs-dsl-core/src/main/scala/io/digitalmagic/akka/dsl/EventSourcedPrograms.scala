@@ -25,11 +25,15 @@ trait EventSourcedPrograms extends EventSourced {
   protected type Index <: IndexList
   protected val clientRuntime: ClientRuntime[Index#List, Index]
 
+  type TransientState
+  val initialTransientState: TransientState
+
   type Program[_]
   implicit val programMonad: Monad[Program]
   val environmentReaderMonad: MonadReader[Program, Environment]
   val eventWriterMonad: MonadTell[Program, Events]
   val stateMonad: MonadState[Program, State]
+  val transientStateMonad: MonadState[Program, TransientState]
   val localIndexQueryMonad: MonadFree[Program, Coyoneda[Index#LocalAlgebra, *]]
   val errorMonad: MonadError[Program, ResponseError]
   val freeMonad: MonadFree[Program, Coyoneda[QueryAlgebra, *]]
@@ -65,6 +69,11 @@ trait EventSourcedPrograms extends EventSourced {
   @inline def gets[A](f: State => A): Program[A] = stateMonad.gets(f)
   @inline def put(s: State): Program[Unit] = stateMonad.put(s)
   @inline def modify(f: State => State): Program[Unit] = stateMonad.modify(f)
+
+  @inline def getTransient: Program[TransientState] = transientStateMonad.get
+  @inline def getsTransient[A](f: TransientState => A): Program[A] = transientStateMonad.gets(f)
+  @inline def putTransient(s: TransientState): Program[Unit] = transientStateMonad.put(s)
+  @inline def modifyTransient(f: TransientState => TransientState): Program[Unit] = transientStateMonad.modify(f)
 
   @inline def raiseError[A](e: ResponseError): Program[A] = errorMonad.raiseError(e)
   @inline def handleError[A](fa: Program[A])(f: ResponseError => Program[A]): Program[A] = errorMonad.handleError(fa)(f)

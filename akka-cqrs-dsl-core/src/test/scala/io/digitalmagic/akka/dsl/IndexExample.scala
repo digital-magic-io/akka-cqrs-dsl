@@ -61,6 +61,9 @@ trait IndexExample extends EventSourcedPrograms {
     override def process(state: State, event: EventType): State = state
   }
 
+  override type TransientState = Unit
+  override lazy val initialTransientState: TransientState = ()
+
   val a1 = new ApiHelper[index1Api.IndexApiType, Index#Algebra, Program] with index1Api.UpdateApi[Index#Algebra, Program]
   val al1 = new ApiHelper[index1Api.LocalQueryType, Index#LocalAlgebra, Program] with index1Api.LocalApi[Index#LocalAlgebra, Program]
   val aq1 = new ApiHelper[index1Api.UniqueIndexQuery, QueryAlgebra, Program] with index1Api.QueryApi[QueryAlgebra, Program]

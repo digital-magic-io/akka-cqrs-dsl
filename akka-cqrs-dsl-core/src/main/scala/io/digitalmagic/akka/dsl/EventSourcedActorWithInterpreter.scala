@@ -40,8 +40,8 @@ object EventSourcedActorWithInterpreter {
   object IndexPostActionKey {
     def apply[I0 <: UniqueIndexApi](a: I0)(k: a.KeyType): IndexPostActionKey = new IndexPostActionKey {
       override type I = I0
-      override val api: I = a
-      override val key: api.KeyType = k.asInstanceOf[api.KeyType]
+      override val api: a.type = a
+      override val key: api.KeyType = k
       override def hashCode(): Int = key.hashCode()
       override def equals(obj: Any): Boolean = obj match {
         case that: IndexPostActionKey => equalsToKey(that)
@@ -99,7 +99,7 @@ object EventSourcedActorWithInterpreter {
   }
 }
 
-trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
+trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras with MonadStateExtras {
   Self: EventSourcedPrograms =>
 
   import EventSourcedActorWithInterpreter._
@@ -109,10 +109,10 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   val logger: LoggingAdapter = Logging.getLogger(context.system, this)
 
   type Logger[T] = WriterT[Identity, Log, T]
-  type Result[T] = ResponseError \/ ((Events, T, State) \/ Coyoneda[Index#LocalAlgebra, FreeT[Coyoneda[Index#LocalAlgebra, *],EitherT[FreeT[Coyoneda[Index#Algebra, *],FreeT[Coyoneda[QueryAlgebra, *],Logger, *], *],ResponseError, *],(Events, T, State)]])
+  type Result[T] = ResponseError \/ ((TransientState, (Events, T, State)) \/ Coyoneda[Index#LocalAlgebra, FreeT[Coyoneda[Index#LocalAlgebra, *], EitherT[FreeT[Coyoneda[Index#Algebra, *], FreeT[Coyoneda[QueryAlgebra, *], Logger, *], *], ResponseError, *], (TransientState, (Events, T, State))]])
 
-  type Program[A] = RWST[FreeT[Coyoneda[Index#LocalAlgebra, *], EitherT[FreeT[Coyoneda[Index#Algebra, *], FreeT[Coyoneda[QueryAlgebra, *], Logger, *], *], ResponseError, *], *], Environment, Events, State, A]
-  override lazy val programMonad: Monad[Program] = Monad[Program]
+  type Program[A] = RWST[StateT[FreeT[Coyoneda[Index#LocalAlgebra, *], EitherT[FreeT[Coyoneda[Index#Algebra, *], FreeT[Coyoneda[QueryAlgebra, *], Logger, *], *], ResponseError, *], *], TransientState, *], Environment, Events, State, A]
+  override lazy val programMonad: Monad[Program] = Monad[Program](rwstMonadTell)
 
   private type QueryStep[T] = FreeT[Coyoneda[QueryAlgebra, *], Logger, Result[T] \/ Coyoneda[Index#Algebra, IndexStep[T]]]
   private type IndexStep[T] = FreeT[Coyoneda[Index#Algebra, *], FreeT[Coyoneda[QueryAlgebra, *], Logger, *], Result[T]]
@@ -121,6 +121,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   override lazy val environmentReaderMonad: MonadReader[Program, Environment] = MonadReader[Program, Environment]
   override lazy val eventWriterMonad: MonadTell[Program, Events] = MonadTell[Program, Events]
   override lazy val stateMonad: MonadState[Program, State] = MonadState[Program, State]
+  override lazy val transientStateMonad: MonadState[Program, TransientState] = MonadState[Program, TransientState]
   override lazy val localIndexQueryMonad: MonadFree[Program, Coyoneda[Index#LocalAlgebra, *]] = MonadFree[Program, Coyoneda[Index#LocalAlgebra, *]]
   override lazy val errorMonad: MonadError[Program, ResponseError] = MonadError[Program, ResponseError]
   override lazy val freeMonad: MonadFree[Program, Coyoneda[QueryAlgebra, *]] = MonadFree[Program, Coyoneda[QueryAlgebra, *]]
@@ -145,6 +146,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
   def clientEventInterpreter: ClientEventInterpreter
 
   protected var state: EventSourcedActorState[State] = EventSourcedActorState(persistentState.empty)
+  private var transientState: TransientState = initialTransientState
   private var needsPassivation: Boolean = false
   private var stashingBehaviourActive: Boolean = false
   private def checkAndPassivate(): Unit = {
@@ -371,9 +373,10 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
           rollback(true, step.postActions)
           sender() ! step.request.failure(error)
 
-        case -\/(-\/(\/-(-\/((events, result, newState))))) =>
+        case -\/(-\/(\/-(-\/((newTransientState, (events, result, newState)))))) =>
           commit(events, step.postActions) { () =>
             state = state.copy(underlying = newState)
+            transientState = newTransientState
             sender() ! step.request.success(result)
           }
 
@@ -398,10 +401,8 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras {
     }
   }
 
-  private def interpret[T](r: Request[T], environment: Environment, program: Program[T]): Unit = {
-    val z = program.run(environment, state.underlying).resume.run
-    interpretStep(NextStep(r, environment, f => f(), IndexPostActions.empty, program.run(environment, state.underlying).resume.run))
-  }
+  private def interpret[T](r: Request[T], environment: Environment, program: Program[T]): Unit =
+    interpretStep(NextStep(r, environment, f => f(), IndexPostActions.empty, program.run(environment, state.underlying).run(transientState).resume.run))
 
   private def processNextStep: Receive = {
     case nextStep: NextStep => interpretStep(nextStep)

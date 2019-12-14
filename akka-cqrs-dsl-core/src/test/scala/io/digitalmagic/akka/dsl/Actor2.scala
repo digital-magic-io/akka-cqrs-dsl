@@ -56,6 +56,9 @@ trait Actor2Programs extends EventSourcedPrograms {
     }
   }
 
+  override type TransientState = Unit
+  override lazy val initialTransientState: TransientState = ()
+
   override type EntityIdType = Unit
 
   override type QueryAlgebra[A] = CopK[TNilK, A]

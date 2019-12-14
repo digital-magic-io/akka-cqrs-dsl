@@ -74,27 +74,27 @@ object StringRepresentable {
       def appendEscaped(sb: StringBuilder, ch: Char): StringBuilder = ch match {
         case '\\' => sb.append("\\\\")
         case ','  => sb.append("\\,")
-        case _    => sb + ch
+        case _    => sb.append(ch)
       }
       val a = aSR.asString(v._1)
       val b = bSR.asString(v._2)
-      b.foldLeft(a.foldLeft(StringBuilder.newBuilder)(appendEscaped) + ',')(appendEscaped).mkString
+      b.foldLeft(a.foldLeft(new StringBuilder())(appendEscaped) .append(','))(appendEscaped).mkString
     }
 
     override def fromString(s: String): Option[(A, B)] = {
-      case class State(first: StringBuilder = StringBuilder.newBuilder, second: Option[StringBuilder] = None, escapeSequence: Boolean = false, failed: Boolean = false) {
+      case class State(first: StringBuilder = new StringBuilder(), second: Option[StringBuilder] = None, escapeSequence: Boolean = false, failed: Boolean = false) {
         def apply(ch: Char): State = (this, ch) match {
           case (State(_, _,       _,     true),  _)    => this
           case (State(_, _,       false, false), '\\') => copy(escapeSequence = true)
           case (State(_, Some(_), false, false), ',')  => copy(failed = true)
-          case (State(_, Some(_), false, false), _)    => copy(second = second.map(_ + ch))
-          case (State(_, Some(_), true,  false), '\\') => copy(second = second.map(_ + ch), escapeSequence = false)
-          case (State(_, Some(_), true,  false), ',')  => copy(second = second.map(_ + ch), escapeSequence = false)
+          case (State(_, Some(_), false, false), _)    => copy(second = second.map(_.append(ch)))
+          case (State(_, Some(_), true,  false), '\\') => copy(second = second.map(_.append(ch)), escapeSequence = false)
+          case (State(_, Some(_), true,  false), ',')  => copy(second = second.map(_.append(ch)), escapeSequence = false)
           case (State(_, Some(_), true,  false), _)    => copy(failed = true)
           case (State(_, None,    false, false), ',')  => copy(second = Some(StringBuilder.newBuilder))
-          case (State(_, None,    false, false), _)    => copy(first = first + ch)
-          case (State(_, None,    true,  false), '\\') => copy(first = first + ch, escapeSequence = false)
-          case (State(_, None,    true,  false), ',')  => copy(first = first + ch, escapeSequence = false)
+          case (State(_, None,    false, false), _)    => copy(first = first.append(ch))
+          case (State(_, None,    true,  false), '\\') => copy(first = first.append(ch), escapeSequence = false)
+          case (State(_, None,    true,  false), ',')  => copy(first = first.append(ch), escapeSequence = false)
           case (State(_, None,    true,  false), _)    => copy(failed = true)
         }
 

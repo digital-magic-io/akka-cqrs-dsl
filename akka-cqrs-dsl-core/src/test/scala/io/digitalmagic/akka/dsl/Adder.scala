@@ -49,6 +49,9 @@ trait AdderPrograms extends EventSourcedPrograms {
   override lazy val stateTag: ClassTag[MyState] = implicitly
   override lazy val persistentState: PersistentStateProcessor[State] = myStateProcessor
 
+  override type TransientState = Unit
+  override lazy val initialTransientState: TransientState = ()
+
   type QueryAlgebra[A] = CopK[Actor1.Query ::: Actor2.Query ::: TNilK, A]
   override val algebraIsQuery: IsQuery[QueryAlgebra] = implicitly
 

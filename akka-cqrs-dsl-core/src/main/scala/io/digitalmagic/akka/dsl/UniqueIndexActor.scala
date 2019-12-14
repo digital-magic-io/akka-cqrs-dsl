@@ -29,6 +29,9 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
   override implicit val stateTag: ClassTag[State] = implicitly
   override lazy val persistentState: PersistentStateProcessor[State] = uniqueIndexState
 
+  override type TransientState = Unit
+  override lazy val initialTransientState: TransientState = ()
+
   override type QueryAlgebra[A] = CopK[ClientQuery ::: TNilK, A]
   override val algebraIsQuery: IsQuery[QueryAlgebra] = implicitly
 

@@ -23,6 +23,10 @@ trait MonadFreeInstances {
   implicit def rwstMonadFree[M[_]: Monad, F[_], R, W: Monoid, S](implicit M: MonadFree[M, F]): MonadFree[RWST[M, R, W, S, *], F] = new MonadFree[RWST[M, R, W, S, *], F] {
     override def liftF[A](fa: F[A]): RWST[M, R, W, S, A] = M.liftF(fa).liftM[RWST[*[_], R, W, S, *]]
   }
+
+  implicit def stateMonadFree[M[_]: Monad, F[_], S](implicit M: MonadFree[M, F]): MonadFree[StateT[M, S, *], F] = new MonadFree[StateT[M, S, *], F] {
+    override def liftF[A](fa: F[A]): StateT[M, S, A] = M.liftF(fa).liftM[StateT[*[_], S, *]]
+  }
 }
 
 object MonadFree extends MonadFreeInstances  {

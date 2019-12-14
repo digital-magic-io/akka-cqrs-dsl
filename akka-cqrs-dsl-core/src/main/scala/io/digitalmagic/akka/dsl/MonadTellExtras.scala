@@ -10,6 +10,11 @@ trait MonadTellExtras {
     override def point[A](a: => A): RWST[F, R, W2, S, A] = T.point(a).liftM[RWST[*[_], R, W2, S, *]]
     override def bind[A, B](fa: RWST[F, R, W2, S, A])(f: A => RWST[F, R, W2, S, B]): RWST[F, R, W2, S, B] = fa flatMap f
   }
+  implicit def stateMonadTell[F[_], W, S](implicit T: MonadTell[F, W]): MonadTell[StateT[F, S, *], W] = new MonadTell[StateT[F, S, *], W] {
+    override def writer[A](w: W, a: A): StateT[F, S, A] = T.writer(w, a).liftM[StateT[*[_], S, *]]
+    override def point[A](a: => A): StateT[F, S, A] = T.point(a).liftM[StateT[*[_], S, *]]
+    override def bind[A, B](fa: StateT[F, S, A])(f: A => StateT[F, S, B]): StateT[F, S, B] = fa flatMap f
+  }
 }
 
 object MonadTellExtras extends MonadTellExtras
