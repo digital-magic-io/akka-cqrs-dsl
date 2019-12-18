@@ -130,9 +130,9 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
 
   implicit def unitToConstUnit[A](x: Unit): Const[Unit, A] = Const(x)
 
-  type IndexResult[T] = ((() => Unit) => Unit, IndexPostActions, T)
+  type IndexResult[T] = ((() => Unit) => Unit, IndexPostActions, Throwable \/ T)
   type IndexFuture[T] = Future[IndexResult[T]]
-  implicit val indexFutureFunctor: Functor[IndexFuture] = Functor[Future] compose Functor[IndexResult]
+  implicit val indexFutureFunctor: Functor[IndexFuture] = Functor[Future] compose Functor[((() => Unit) => Unit, IndexPostActions, *)] compose Functor[Throwable \/ *]
 
   def entityId: EntityIdType
   def interpreter: QueryAlgebra ~> LazyFuture
@@ -296,8 +296,8 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
           },
           completion = { _ =>
             events.traverse(e => A.lowLevelApi(api).startAcquisition(entityId, e.key)(dispatcher)) onComplete {
-              case TrySuccess(_) => p.success((f => f(), indexPostActions, ()))
-              case TryFailure(cause) => p.failure(cause)
+              case TrySuccess(_) => p.success((f => f(), indexPostActions, \/-(())))
+              case TryFailure(cause) => p.success((f => f(), indexPostActions, -\/(cause)))
             }
           }
         )
@@ -321,7 +321,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
               handler = { event => processIndexEvent(event) },
               completion = { _ => f() }
             )
-          }, indexPostActions, ())
+          }, indexPostActions, \/-(()))
         }
     }
   }
@@ -386,7 +386,8 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
         case -\/(\/-(idx)) =>
           val replyTo = sender()
           idx.trans(indexInterpreter).run onComplete {
-            case scala.util.Success(rest) => self.tell(step.nextIndexStep(rest._1, rest._2, rest._3), replyTo)
+            case scala.util.Success((cont, postActions, \/-(res))) => self.tell(step.nextIndexStep(cont, postActions, res), replyTo)
+            case scala.util.Success((_, postActions, -\/(err))) => self.tell(FailStep(step.postActions |+| postActions, step.request, err), replyTo)
             case scala.util.Failure(err) => self.tell(FailStep(step.postActions, step.request, err), replyTo)
           }
 
