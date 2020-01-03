@@ -64,10 +64,10 @@ trait IndexExample extends EventSourcedPrograms {
   override type TransientState = Unit
   override lazy val initialTransientState: TransientState = ()
 
-  val a1 = new ApiHelper[index1Api.IndexApiType, Index#Algebra, Program] with index1Api.UpdateApi[Index#Algebra, Program]
-  val al1 = new ApiHelper[index1Api.LocalQueryType, Index#LocalAlgebra, Program] with index1Api.LocalApi[Index#LocalAlgebra, Program]
-  val aq1 = new ApiHelper[index1Api.UniqueIndexQuery, QueryAlgebra, Program] with index1Api.QueryApi[QueryAlgebra, Program]
-  val a2 = new ApiHelper[index2Api.IndexApiType, Index#Algebra, Program] with index2Api.UpdateApi[Index#Algebra, Program]
+  val a1 = new index1Api.IndexUpdateApi[Program]
+  val al1 = new index1Api.IndexLocalQueryApi[Program]
+  val aq1 = new index1Api.UniqueIndexQueryApi[Program]
+  val a2 = new index2Api.IndexUpdateApi[Program]
 
   def acquire(fail: Boolean): Program[Unit] = for {
     _  <- a1.acquire("abc")

@@ -38,7 +38,7 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
   override type Index = EmptyIndexList
   override val clientRuntime: ClientRuntime[Index#List, Index] = implicitly
 
-  val clientApi = new ApiHelper[ClientQuery, QueryAlgebra, Program] with ClientApi[QueryAlgebra, Program]
+  val clientApi = new ClientApi[Program]
 
   def askAndLog[U](entityId: indexApi.EntityIdType, key: KeyType)(f: IsIndexNeededResponse => Program[U]): Program[U] = for {
     _        <- log(_.debug(s"[$key] is in unconfirmed state, asking [$entityId] if it is still needed"))

@@ -58,8 +58,8 @@ trait AdderPrograms extends EventSourcedPrograms {
   override type Index = EmptyIndexList
   override val clientRuntime: ClientRuntime[Index#List, Index] = implicitly
 
-  val a1 = new ApiHelper[Actor1.Query, QueryAlgebra, Program] with Actor1.Api[QueryAlgebra, Program]
-  val a2 = new ApiHelper[Actor2.Query, QueryAlgebra, Program] with Actor2.Api[QueryAlgebra, Program]
+  val a1 = new Actor1.Api[Program]
+  val a2 = new Actor2.Api[Program]
 
   def queryAndAdd: Program[Int] = for {
     v1 <- a1.getValue

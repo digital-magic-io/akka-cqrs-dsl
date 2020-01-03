@@ -40,16 +40,31 @@ trait EventSourcedPrograms extends EventSourced {
   val indexFreeMonad: MonadFree[Program, Coyoneda[Index#Algebra, *]]
   val logWriterMonad: MonadTell[Program, Log]
 
-  implicit val queryAlgebraNat: QueryAlgebra ~> Program = Lambda[QueryAlgebra ~> Program] {
+  @deprecated("This is not needed any more when using new Api classes", "2.0.18")
+  implicit val queryAlgebraNatDeprecated: QueryAlgebra ~> Program = Lambda[QueryAlgebra ~> Program] {
     q => freeMonad.liftF(Coyoneda.lift(q))
   }
 
-  implicit val indexAlgebraNat: Index#Algebra ~> Program = Lambda[Index#Algebra ~> Program] {
+  implicit def queryAlgebraNat[T[_]](implicit inj: CopK.Inject[T, QueryAlgebra]): T ~> Program = Lambda[T ~> Program] {
+    q => freeMonad.liftF(Coyoneda.lift(inj(q)))
+  }
+
+  @deprecated("This is not needed any more when using new Api classes", "2.0.18")
+  implicit val indexAlgebraNatDeprecated: Index#Algebra ~> Program = Lambda[Index#Algebra ~> Program] {
     fa => indexFreeMonad.liftF(Coyoneda.lift(fa))
   }
 
-  implicit val localAlgebraNat: Index#LocalAlgebra ~> Program = Lambda[Index#LocalAlgebra ~> Program] {
+  implicit def indexAlgebraNat[T[_]](implicit inj: CopK.Inject[T, Index#Algebra]): T ~> Program = Lambda[T ~> Program] {
+    fa => indexFreeMonad.liftF(Coyoneda.lift(inj(fa)))
+  }
+
+  @deprecated("This is not needed any more when using new Api classes", "2.0.18")
+  implicit val localAlgebraNatDeprecated: Index#LocalAlgebra ~> Program = Lambda[Index#LocalAlgebra ~> Program] {
     fa => localIndexQueryMonad.liftF(Coyoneda.lift(fa))
+  }
+
+  implicit def localAlgebraNat[T[_]](implicit inj: CopK.Inject[T, Index#LocalAlgebra]): T ~> Program = Lambda[T ~> Program] {
+    fa => localIndexQueryMonad.liftF(Coyoneda.lift(inj(fa)))
   }
 
   @inline def pure[A](v: A): Program[A] = programMonad.pure(v)

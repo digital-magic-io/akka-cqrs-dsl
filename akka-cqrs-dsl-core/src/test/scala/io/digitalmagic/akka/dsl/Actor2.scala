@@ -16,9 +16,8 @@ object Actor2 {
 
   case class SetValue(value: Int) extends Command[Unit]
 
-  trait Api[Alg[A] <: CopK[_, A], Program[_]] {
-    this: ApiHelper[Query, Alg, Program] =>
-    def getValue: Program[Int] = GetValue
+  class Api[Program[_]](implicit N: Query ~> Program) {
+    def getValue: Program[Int] = N(GetValue)
   }
 
   def interpreter(actorSelection: ActorSelection): Query ~> LazyFuture = Lambda[Query ~> LazyFuture] {
