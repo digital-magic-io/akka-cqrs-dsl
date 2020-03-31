@@ -50,6 +50,8 @@ case class ClientIndexesStateMap private(map: Map[UniqueIndexApi, UniqueIndexApi
     ClientIndexesStateMap(map + (api -> newState))
   }
 
+  def filter(p: UniqueIndexApi => Boolean): ClientIndexesStateMap = ClientIndexesStateMap(map.filter(pair => p(pair._1)))
+
   def process[A <: UniqueIndexApi](api: A)(event: api.ClientEventType): ClientIndexesStateMap = modify(api) { state =>
     import api._
       (state.get(event.key), event) match {

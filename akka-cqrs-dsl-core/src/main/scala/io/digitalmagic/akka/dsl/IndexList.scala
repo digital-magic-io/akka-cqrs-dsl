@@ -54,6 +54,7 @@ final class WithIndex[L <: TList, AL <: TListK, CAL <: TListK, CEL <: TList, LAL
 trait ClientRuntime[L <: TList, IL <: IndexList] {
   def injectQuery: UniqueIndexApi#ClientQuery ~> Lambda[a => Option[IL#ClientAlgebra[a]]]
   def injectEvent(e: UniqueIndexApi#ClientEvent): Option[IL#ClientEventAlgebra]
+  def hasIndex(api: UniqueIndexApi): Boolean
 }
 
 object ClientRuntime {
@@ -62,6 +63,7 @@ object ClientRuntime {
       _ => None
     }
     override def injectEvent(e: UniqueIndexApi#ClientEvent): Option[IL#ClientEventAlgebra] = None
+    override def hasIndex(api: UniqueIndexApi): Boolean = false
   }
 
   implicit def induct[E,
@@ -71,6 +73,7 @@ object ClientRuntime {
                       T[X] >: I#ClientQuery[X] <: I#ClientQuery[X],
                       U
                      ](implicit
+                       I: I,
                        L: ClientRuntime[L, IL],
                        QA: UniqueIndexApi.ClientQueryAux[E, I, T],
                        QI: CopK.Inject[T, IL#ClientAlgebra],
@@ -84,5 +87,6 @@ object ClientRuntime {
       }
       override def injectEvent(e: UniqueIndexApi#ClientEvent): Option[IL#ClientEventAlgebra] =
         EA.clientEventRuntimeInject(e).orElse(L.injectEvent(e))
+      override def hasIndex(api: UniqueIndexApi): Boolean = api == I || L.hasIndex(api)
     }
 }

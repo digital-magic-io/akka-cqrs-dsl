@@ -191,7 +191,6 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
     clientRuntime.injectEvent(event) match {
       case Some(e) => state = state.copy(indexesState = clientEventInterpreter(e)(state.indexesState))
       case None => logger.warning(s"unknown client index event: $event")
-
     }
   }
 
@@ -199,7 +198,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
     case s: EventSourcedActorState[_] =>
       processSnapshot(s.underlying) match {
         case Some(x) =>
-          state = EventSourcedActorState(x, s.indexesState)
+          state = EventSourcedActorState(x, s.indexesState.filter(clientRuntime.hasIndex))
         case None =>
           logger.error(s"$persistenceId: failed to process SnapshotOffer [$metadata], remove and continue")
           deleteSnapshot(metadata.sequenceNr)
@@ -237,7 +236,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
     context.stop(self)
   }
 
-  def rollback(normalMode: Boolean, postActions: IndexPostActions): Unit = {
+  private def rollback(normalMode: Boolean, postActions: IndexPostActions): Unit = {
     val events = postActions.rollbackEvents
 
     persistEvents(events)(
@@ -253,7 +252,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
     )
   }
 
-  def commit(events: Events, postActions: IndexPostActions)(completion: () => Unit): Unit = {
+  private def commit(events: Events, postActions: IndexPostActions)(completion: () => Unit): Unit = {
     val indexEvents = postActions.commitEvents
 
     persistEvents(events ++ indexEvents)(
