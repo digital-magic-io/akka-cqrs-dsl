@@ -39,11 +39,11 @@ object Domain {
 import Domain._
 
 object TestApiService {
-  def props() = Props(new TestApiService())
+  def props(): Props = Props(new TestApiService())
 }
 
 class TestApiService() extends Actor {
-  override def receive(): Receive = receive(0)
+  override def receive: Receive = receive(0)
 
   def receive(value: Int): Receive = {
     case QueryValue => sender() ! QueryValue.found(value)

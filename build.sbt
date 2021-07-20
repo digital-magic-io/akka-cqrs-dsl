@@ -2,26 +2,34 @@ import sbt.Keys._
 
 organizationHomepage := Some(url("http://www.digital-magic.io"))
 startYear            := Some(2016)
+Test / classLoaderLayeringStrategy := ClassLoaderLayeringStrategy.ScalaLibrary
+
+val scala212Options = Seq(
+  "-feature",
+  "-deprecation",
+  "-unchecked",
+  "-language:reflectiveCalls",
+  "-language:postfixOps",
+  "-language:implicitConversions",
+  "-language:higherKinds",
+  "-Ypartial-unification"
+)
+
+val scala213Options = scala212Options.filterNot(_ == "-Ypartial-unification")
 
 val buildSettings = Seq(
   organization := "io.digital-magic",
-  version      := "2.0.19",  // don't forget to bump version in .bintray.json
-  parallelExecution in Test := false,
-  scalaVersion       := Dependencies.Versions.scala212,
-  crossScalaVersions := Seq(Dependencies.Versions.scala212),
-  scalacOptions := Seq(
-    "-feature",
-    "-deprecation",
-    "-unchecked",
-    "-language:reflectiveCalls",
-    "-language:postfixOps",
-    "-language:implicitConversions",
-    "-language:higherKinds",
-    "-Ypartial-unification"
-  ),
+  version      := "2.1.0",  // don't forget to bump version in .bintray.json
+  Test / parallelExecution := false,
+  scalaVersion       := Dependencies.Versions.scala_2_12,
+  crossScalaVersions := Seq(Dependencies.Versions.scala_2_12, Dependencies.Versions.scala_2_13),
+  scalacOptions ++= (CrossVersion.partialVersion(scalaVersion.value) match {
+    case Some((2, 12)) => scala212Options
+    case Some((2, 13)) => scala213Options
+    case _ => Nil
+  }),
   resolvers ++= Seq(
-    Resolver.sonatypeRepo("releases"),
-    "dnvriend" at "http://dl.bintray.com/dnvriend/maven"
+    Resolver.sonatypeRepo("releases")
   )
 )
 

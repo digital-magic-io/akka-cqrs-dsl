@@ -1,12 +1,12 @@
 package io.digitalmagic.akka.dsl
 
 import java.time.Instant
-
 import akka.actor.{ActorSelection, Props}
+import io.digitalmagic.coproduct.{Cop, CopK, TNilK}
 import io.digitalmagic.akka.dsl.API._
-import iotaz.{CopK, TNilK}
+import io.digitalmagic.akka.dsl.EventSourcedActorWithInterpreter.IndexFuture
 import scalaz._
-import Scalaz._
+import scalaz.Scalaz._
 
 import scala.reflect.ClassTag
 
@@ -90,9 +90,9 @@ class Actor1 extends Actor1Programs with EventSourcedActorWithInterpreter {
   override def entityId: Unit = ()
   override def persistenceId: String = s"${context.system.name}.Actor1"
 
-  override def interpreter: QueryAlgebra ~> LazyFuture = CopK.NaturalTransformation.summon[QueryAlgebra, LazyFuture]
-  override def indexInterpreter: Index#Algebra ~> IndexFuture = CopK.NaturalTransformation.summon[Index#Algebra, IndexFuture]
-  override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, *] = CopK.NaturalTransformation.summon[Index#ClientAlgebra, Const[Unit, *]]
-  override def localApiInterpreter: Index#LocalAlgebra ~> Id = CopK.NaturalTransformation.summon[Index#LocalAlgebra, Id]
-  override def clientEventInterpreter: ClientEventInterpreter = implicitly
+  override def interpreter: QueryAlgebra ~> LazyFuture = CopK.NaturalTransformation.summon
+  override def indexInterpreter: Index#Algebra ~> IndexFuture = CopK.NaturalTransformation.summon
+  override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, *] = CopK.NaturalTransformation.summon
+  override def localApiInterpreter: Index#LocalAlgebra ~> Id = CopK.NaturalTransformation.summon
+  override def clientEventInterpreter: ClientEventInterpreter = Cop.Function.summon
 }

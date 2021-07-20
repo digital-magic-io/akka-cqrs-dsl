@@ -1,6 +1,6 @@
 package io.digitalmagic.akka.dsl
 
-import iotaz._
+import io.digitalmagic.coproduct._
 import scalaz._
 
 import scala.reflect.ClassTag

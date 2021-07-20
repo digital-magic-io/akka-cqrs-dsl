@@ -5,8 +5,8 @@ import akka.cluster.sharding.ShardRegion.Passivate
 import akka.event.{Logging, LoggingAdapter}
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotMetadata, SnapshotOffer}
 import io.digitalmagic.akka.dsl.API._
-import iotaz.{TList, evidence}
 import scalaz._
+import scalaz.syntax.invariantFunctor._
 import scalaz.Scalaz._
 import scalaz.Tags._
 
@@ -29,6 +29,9 @@ trait DummyActor extends PersistentActor {
 }
 
 object EventSourcedActorWithInterpreter {
+  type IndexResult[T] = ((() => Unit) => Unit, IndexPostActions, Throwable \/ T)
+  type IndexFuture[T] = Future[IndexResult[T]]
+
   case class EventSourcedActorState[+State <: PersistentState](underlying: State, indexesState: ClientIndexesStateMap = ClientIndexesStateMap())
   case object Stop extends NoSerializationVerificationNeeded
 
@@ -107,16 +110,22 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
   import context.dispatcher
 
   val logger: LoggingAdapter = Logging.getLogger(context.system, this)
+  type Logger[T] = WriterT[Log, Identity, T]
+  type QueryY[T] = Coyoneda[QueryAlgebra, T]
+  type IndexY[T] = Coyoneda[Index#Algebra, T]
+  type LocalY[T] = Coyoneda[Index#LocalAlgebra, T]
+  type QueryT[M[_], T] = FreeT[QueryY, M, T]
+  type IndexT[M[_], T] = FreeT[IndexY, M, T]
+  type LocalT[M[_], T] = FreeT[LocalY, M, T]
+  type Result[T] = ResponseError \/ (LocalY[LocalT[EitherT[ResponseError, IndexT[QueryT[Logger, *], *], *], (TransientState, (Events, T, State))]] \/ (TransientState, (Events, T, State)))
 
-  type Logger[T] = WriterT[Identity, Log, T]
-  type Result[T] = ResponseError \/ ((TransientState, (Events, T, State)) \/ Coyoneda[Index#LocalAlgebra, FreeT[Coyoneda[Index#LocalAlgebra, *], EitherT[FreeT[Coyoneda[Index#Algebra, *], FreeT[Coyoneda[QueryAlgebra, *], Logger, *], *], ResponseError, *], (TransientState, (Events, T, State))]])
+  type Program[A] = RWST[Environment, Events, State, StateT[TransientState, LocalT[EitherT[ResponseError, IndexT[QueryT[Logger, *], *], *], *], *], A]
 
-  type Program[A] = RWST[StateT[FreeT[Coyoneda[Index#LocalAlgebra, *], EitherT[FreeT[Coyoneda[Index#Algebra, *], FreeT[Coyoneda[QueryAlgebra, *], Logger, *], *], ResponseError, *], *], TransientState, *], Environment, Events, State, A]
   override lazy val programMonad: Monad[Program] = Monad[Program](rwstMonadTell)
 
-  private type QueryStep[T] = FreeT[Coyoneda[QueryAlgebra, *], Logger, Result[T] \/ Coyoneda[Index#Algebra, IndexStep[T]]]
   private type IndexStep[T] = FreeT[Coyoneda[Index#Algebra, *], FreeT[Coyoneda[QueryAlgebra, *], Logger, *], Result[T]]
-  private type StepResult[T] = Identity[(Log, Result[T] \/ Coyoneda[Index#Algebra, IndexStep[T]] \/ Coyoneda[QueryAlgebra, QueryStep[T]])]
+  private type QueryStep[T] = QueryT[Logger, IndexY[IndexStep[T]] \/ Result[T]]
+  private type StepResult[T] = Identity[(Log, QueryY[QueryStep[T]] \/ (IndexY[IndexStep[T]] \/ Result[T]))]
 
   override lazy val environmentReaderMonad: MonadReader[Program, Environment] = MonadReader[Program, Environment]
   override lazy val eventWriterMonad: MonadTell[Program, Events] = MonadTell[Program, Events]
@@ -130,8 +139,6 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
 
   implicit def unitToConstUnit[A](x: Unit): Const[Unit, A] = Const(x)
 
-  type IndexResult[T] = ((() => Unit) => Unit, IndexPostActions, Throwable \/ T)
-  type IndexFuture[T] = Future[IndexResult[T]]
   implicit val indexFutureFunctor: Functor[IndexFuture] = Functor[Future] compose Functor[((() => Unit) => Unit, IndexPostActions, *)] compose Functor[Throwable \/ *]
 
   def entityId: EntityIdType
@@ -141,8 +148,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
   def localApiInterpreter: Index#LocalAlgebra ~> Id
 
   type ClientEventInterpreter = Index#ClientEventAlgebra => ClientIndexesStateMap => ClientIndexesStateMap
-  implicit def genClientEventInterpreter(implicit interpreters: evidence.All[TList.Op.Map[ClientEventInterpreterS[EntityIdType, *], Index#ClientEventList]]): ClientEventInterpreter =
-    e => s => interpreters.underlying.values(e.index).asInstanceOf[ClientEventInterpreterS[EntityIdType, Any]](e.value, s)
+  implicit def genClientEventInterpreter[E, I <: UniqueIndexApi, T](implicit api: UniqueIndexApi.ClientEventAux[E, I, T]): T => ClientIndexesStateMap => ClientIndexesStateMap = e => s => s.process(api)(e)
   def clientEventInterpreter: ClientEventInterpreter
 
   protected var state: EventSourcedActorState[State] = EventSourcedActorState(persistentState.empty)
@@ -288,7 +294,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
               (List(), IndexPostActions.empty)
           }
         }
-        val p = Promise[IndexResult[Unit]]
+        val p = Promise[IndexResult[Unit]]()
         persistEvents(events)(
           handler = { event =>
             processIndexEvent(event)
@@ -368,21 +374,21 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
       log.foreach(_(logger))
 
       programRes match {
-        case -\/(-\/(-\/(error))) =>
+        case \/-(\/-(-\/(error))) =>
           rollback(true, step.postActions)
           sender() ! step.request.failure(error)
 
-        case -\/(-\/(\/-(-\/((newTransientState, (events, result, newState)))))) =>
+        case \/-(\/-(\/-(\/-((newTransientState, (events, result, newState)))))) =>
           commit(events, step.postActions) { () =>
             state = state.copy(underlying = newState)
             transientState = newTransientState
             sender() ! step.request.success(result)
           }
 
-        case -\/(-\/(\/-(\/-(local)))) =>
+        case \/-(\/-(\/-(-\/(local)))) =>
           interpretStep(step.nextIndexStep(f => f(), IndexPostActions.empty, local.trans(localApiInterpreter).run.resume.run))
 
-        case -\/(\/-(idx)) =>
+        case \/-(-\/(idx)) =>
           val replyTo = sender()
           idx.trans(indexInterpreter).run onComplete {
             case scala.util.Success((cont, postActions, \/-(res))) => self.tell(step.nextIndexStep(cont, postActions, res), replyTo)
@@ -390,7 +396,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
             case scala.util.Failure(err) => self.tell(FailStep(step.postActions, step.request, err), replyTo)
           }
 
-        case \/-(ex) =>
+        case -\/(ex) =>
           val replyTo = sender()
           val queryFuture = ex.trans(interpreter).run
           queryFuture(dispatcher) onComplete {

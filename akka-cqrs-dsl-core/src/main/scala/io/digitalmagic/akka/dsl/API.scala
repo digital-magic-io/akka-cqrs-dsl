@@ -3,8 +3,6 @@ package io.digitalmagic.akka.dsl
 import akka.actor.{ActorRef, ActorSelection}
 import akka.pattern.ask
 import akka.util.Timeout
-import scalaz._
-import Scalaz._
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}

@@ -1,9 +1,9 @@
 package io.digitalmagic.akka.dsl
 
+import org.scalacheck.Arbitrary
 import org.specs2.{ScalaCheck, Specification}
 import scalaz._
-import Scalaz._
-import org.scalacheck.Arbitrary
+import scalaz.Scalaz._
 import scalaz.scalacheck.ScalazProperties._
 
 import scala.concurrent.Await
