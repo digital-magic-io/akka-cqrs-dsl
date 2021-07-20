@@ -3,8 +3,8 @@ package io.digitalmagic.akka.dsl
 import java.time.Instant
 
 import akka.actor.{ActorRef, ActorSelection}
+import io.digitalmagic.coproduct.{Cop, CopK}
 import io.digitalmagic.akka.dsl.API._
-import iotaz.{Cop, CopK}
 import scalaz._
 import scalaz.Scalaz._
 

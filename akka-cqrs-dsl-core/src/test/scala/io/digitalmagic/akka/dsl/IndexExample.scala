@@ -2,12 +2,13 @@ package io.digitalmagic.akka.dsl
 
 import akka.actor.Props
 import akka.cluster.sharding.ShardRegion.{ExtractEntityId, ExtractShardId}
+import io.digitalmagic.coproduct.TListK.:::
+import io.digitalmagic.coproduct.{Cop, CopK, TCons, TNil, TNilK}
 import io.digitalmagic.akka.dsl
 import io.digitalmagic.akka.dsl.API._
-import iotaz.TListK.:::
-import iotaz.{CopK, TNilK}
-import scalaz.Scalaz._
+import io.digitalmagic.akka.dsl.EventSourcedActorWithInterpreter.IndexFuture
 import scalaz._
+import scalaz.Scalaz._
 
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
@@ -104,7 +105,7 @@ trait IndexExample extends EventSourcedPrograms {
   val getBatch: Program[Map[String, String]] = aq1.getEntityIds(Set("abc", "def"))
 
   def genericCommand(actions: List[Action]): Program[Unit] = for {
-    _ <- actions.reverse.foldMapM {
+    _ <- actions.traverse_ {
       case AcquireAction(key) => a1.acquire(key)
       case ReleaseAction(key) => a1.release(key)
       case FailAction => raiseError[Unit](API.InternalError(new RuntimeException))
@@ -153,12 +154,14 @@ case class IndexExampleActor(name: String, entityId: String)(implicit I1: Unique
 
   context.setReceiveTimeout(1 seconds)
 
+  val z = genClientEventInterpreter(index1Api)
+
   implicit val index1QueryApi = I1.queryApiInterpreter(index1Api)
-  override def interpreter: QueryAlgebra ~> LazyFuture = CopK.NaturalTransformation.summon[QueryAlgebra, LazyFuture]
-  override def indexInterpreter: Index#Algebra ~> IndexFuture = CopK.NaturalTransformation.summon[Index#Algebra, IndexFuture]
-  override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, *] = CopK.NaturalTransformation.summon[Index#ClientAlgebra, Const[Unit, *]]
-  override def localApiInterpreter: Index#LocalAlgebra ~> Id = CopK.NaturalTransformation.summon[Index#LocalAlgebra, Id]
-  override def clientEventInterpreter: ClientEventInterpreter = implicitly
+  override def interpreter: QueryAlgebra ~> LazyFuture = CopK.NaturalTransformation.summon
+  override def indexInterpreter: Index#Algebra ~> IndexFuture = CopK.NaturalTransformation.summon
+  override def clientApiInterpreter: Index#ClientAlgebra ~> Const[Unit, *] = CopK.NaturalTransformation.summon
+  override def localApiInterpreter: Index#LocalAlgebra ~> Id = CopK.NaturalTransformation.summon
+  override def clientEventInterpreter: ClientEventInterpreter = Cop.Function.summon
 
   override def persistenceId = s"${context.system.name}.IndexExample.v1.$name.$entityId"
 }

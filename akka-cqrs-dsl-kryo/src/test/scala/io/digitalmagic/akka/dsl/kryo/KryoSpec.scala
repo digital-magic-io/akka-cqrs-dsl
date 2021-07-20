@@ -3,7 +3,7 @@ package io.digitalmagic.akka.dsl.kryo
 import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.io.{Input, Output}
 import com.esotericsoftware.kryo.util.{DefaultClassResolver, DefaultStreamFactory, MapReferenceResolver}
-import com.romix.scala.serialization.kryo.ScalaKryo
+import io.altoo.akka.serialization.kryo.serializer.scala.ScalaKryo
 import io.digitalmagic.akka.dsl.EventSourcedActorWithInterpreter.EventSourcedActorState
 import io.digitalmagic.akka.dsl.{ClientIndexesStateMap, Event, PersistentState, UniqueIndexApi}
 import org.objenesis.strategy.StdInstantiatorStrategy

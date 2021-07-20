@@ -91,7 +91,7 @@ object StringRepresentable {
           case (State(_, Some(_), true,  false), '\\') => copy(second = second.map(_.append(ch)), escapeSequence = false)
           case (State(_, Some(_), true,  false), ',')  => copy(second = second.map(_.append(ch)), escapeSequence = false)
           case (State(_, Some(_), true,  false), _)    => copy(failed = true)
-          case (State(_, None,    false, false), ',')  => copy(second = Some(StringBuilder.newBuilder))
+          case (State(_, None,    false, false), ',')  => copy(second = Some(new StringBuilder()))
           case (State(_, None,    false, false), _)    => copy(first = first.append(ch))
           case (State(_, None,    true,  false), '\\') => copy(first = first.append(ch), escapeSequence = false)
           case (State(_, None,    true,  false), ',')  => copy(first = first.append(ch), escapeSequence = false)

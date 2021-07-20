@@ -1,8 +1,8 @@
 package io.digitalmagic.akka.dsl
 
 import akka.event.LoggingAdapter
+import io.digitalmagic.coproduct.CopK
 import io.digitalmagic.akka.dsl.API.{Request, ResponseError}
-import iotaz.CopK
 import scalaz._
 import Scalaz._
 
@@ -77,7 +77,7 @@ trait EventSourcedPrograms extends EventSourced {
   @inline def writer[A](w: Events, v: A): Program[A] = eventWriterMonad.writer(w, v)
   @inline def tell(w: Events): Program[Unit] = eventWriterMonad.tell(w)
 
-  @inline def state[A](a: A): Program[A] = stateMonad.state(a)
+  @inline def state[A](a: A): Program[A] = init >>= (_ => a.pure[Program])
   @inline def constantState[A](a: A, s: => State): Program[A] = stateMonad.constantState(a, s)
   @inline def init: Program[State] = stateMonad.init
   @inline def get: Program[State] = stateMonad.get

@@ -1,8 +1,8 @@
 package io.digitalmagic.akka.dsl
 
-import iotaz._
-import TList.:::
-import TListK.{::: => ::::}
+import io.digitalmagic.coproduct.TList.:::
+import io.digitalmagic.coproduct.TListK.{::: => ::::}
+import io.digitalmagic.coproduct.{Cop, CopK, TList, TListK, TNil, TNilK}
 import scalaz._
 
 trait ClientEventInterpreterS[E, T] {

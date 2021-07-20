@@ -4,12 +4,12 @@ import scalaz._
 import scalaz.Scalaz._
 
 trait MonadStateExtras {
-  implicit def rwstMonadState[F[_], R, W: Monoid, S1, S2](implicit S: MonadState[F, S1]): MonadState[RWST[F, R, W, S2, *], S1] = new MonadState[RWST[F, R, W, S2, *], S1] {
-    override def init: RWST[F, R, W, S2, S1] = S.init.liftM[RWST[*[_], R, W, S2, *]]
-    override def get: RWST[F, R, W, S2, S1] = S.get.liftM[RWST[*[_], R, W, S2, *]]
-    override def put(s: S1): RWST[F, R, W, S2, Unit] = S.put(s).liftM[RWST[*[_], R, W, S2, *]]
-    override def point[A](a: => A): RWST[F, R, W, S2, A] = S.point(a).liftM[RWST[*[_], R, W, S2, *]]
-    override def bind[A, B](fa: RWST[F, R, W, S2, A])(f: A => RWST[F, R, W, S2, B]): RWST[F, R, W, S2, B] = fa flatMap f
+  implicit def rwstMonadState[F[_], R, W: Monoid, S1, S2](implicit S: MonadState[F, S1]): MonadState[RWST[R, W, S2, F, *], S1] = new MonadState[RWST[R, W, S2, F, *], S1] {
+    override def init: RWST[R, W, S2, F, S1] = S.init.liftM[RWST[R, W, S2, *[_], *]]
+    override def get: RWST[R, W, S2, F, S1] = S.get.liftM[RWST[R, W, S2, *[_], *]]
+    override def put(s: S1): RWST[R, W, S2, F, Unit] = S.put(s).liftM[RWST[R, W, S2, *[_], *]]
+    override def point[A](a: => A): RWST[R, W, S2, F, A] = S.point(a).liftM[RWST[R, W, S2, *[_], *]]
+    override def bind[A, B](fa: RWST[R, W, S2, F, A])(f: A => RWST[R, W, S2, F, B]): RWST[R, W, S2, F, B] = fa flatMap f
   }
 }
 

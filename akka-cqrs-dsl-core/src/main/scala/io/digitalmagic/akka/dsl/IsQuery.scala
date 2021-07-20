@@ -1,8 +1,8 @@
 package io.digitalmagic.akka.dsl
 
+import io.digitalmagic.coproduct.TListK.:::
+import io.digitalmagic.coproduct.{CopK, TListK, TNilK}
 import io.digitalmagic.akka.dsl.API.Query
-import iotaz._
-import TListK.:::
 
 import scala.annotation.implicitNotFound
 
