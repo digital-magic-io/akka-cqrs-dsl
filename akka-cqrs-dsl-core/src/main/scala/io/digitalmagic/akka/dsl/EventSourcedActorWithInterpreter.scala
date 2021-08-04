@@ -184,7 +184,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
     } else {
       var processed = 0
       persistAll(events) { event =>
-        processed += 1 
+        processed += 1
         handler(event)
         if (processed == events.size) {
           completion(true)

@@ -52,7 +52,8 @@ trait AdderPrograms extends EventSourcedPrograms {
   override type TransientState = Unit
   override lazy val initialTransientState: TransientState = ()
 
-  type QueryAlgebra[A] = CopK[Actor1.Query ::: Actor2.Query ::: TNilK, A]
+  override type QueryList = Actor1.Query ::: Actor2.Query ::: TNilK
+  override type QueryAlgebra[A] = CopK[QueryList, A]
   override val algebraIsQuery: IsQuery[QueryAlgebra] = implicitly
 
   override type Index = EmptyIndexList

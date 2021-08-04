@@ -1,8 +1,5 @@
 package io.digitalmagic.akka.dsl
 
-import io.digitalmagic.coproduct._
-import scalaz._
-
 import scala.reflect.ClassTag
 
 trait Event extends Product with Serializable {
@@ -28,9 +25,4 @@ trait EventSourced {
   type State <: PersistentState { type EventType = EventSourced.this.EventType }
   implicit val stateTag: ClassTag[State]
   val persistentState: PersistentStateProcessor[State]
-}
-
-@deprecated("This is not needed any more when using new Api classes", "2.0.18")
-class ApiHelper[F[_], Alg[A] <: CopK[_, A], Program[_]](implicit val I: CopK.Inject[F, Alg], val T: Alg ~> Program) {
-  implicit def lift[A](fa: F[A]): Program[A] = T(I(fa))
 }

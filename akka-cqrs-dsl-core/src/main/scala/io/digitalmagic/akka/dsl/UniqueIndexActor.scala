@@ -33,7 +33,8 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
   override type TransientState = Unit
   override lazy val initialTransientState: TransientState = ()
 
-  override type QueryAlgebra[A] = CopK[ClientQuery ::: TNilK, A]
+  override type QueryList = ClientQuery ::: TNilK
+  override type QueryAlgebra[A] = CopK[QueryList, A]
   override val algebraIsQuery: IsQuery[QueryAlgebra] = implicitly
 
   override type Index = EmptyIndexList

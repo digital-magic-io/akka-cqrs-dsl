@@ -1,7 +1,7 @@
 package io.digitalmagic.akka.dsl
 
-import io.digitalmagic.coproduct.TList.:::
-import io.digitalmagic.coproduct.TListK.{::: => ::::}
+import io.digitalmagic.coproduct.TList.::
+import io.digitalmagic.coproduct.TListK.:::
 import io.digitalmagic.coproduct.{Cop, CopK, TList, TListK, TNil, TNilK}
 import scalaz._
 
@@ -24,7 +24,7 @@ sealed trait IndexList {
   type LocalAlgebraList <: TListK
   type LocalAlgebra[A] <: CopK[LocalAlgebraList, A]
 
-  type + [I <: UniqueIndexApi] = WithIndex[I ::: List, I#IndexApiType :::: AlgebraList, I#ClientQueryType :::: ClientAlgebraList, I#ClientEventType ::: ClientEventList, I#LocalQueryType :::: LocalAlgebraList]
+  type + [I <: UniqueIndexApi] = WithIndex[I :: List, I#IndexApiType ::: AlgebraList, I#ClientQueryType ::: ClientAlgebraList, I#ClientEventType :: ClientEventList, I#LocalQueryType ::: LocalAlgebraList]
 }
 
 final class EmptyIndexList extends IndexList {
@@ -58,6 +58,8 @@ trait ClientRuntime[L <: TList, IL <: IndexList] {
 }
 
 object ClientRuntime {
+  def apply[Index <: IndexList](implicit clientRuntime: ClientRuntime[Index#List, Index]): ClientRuntime[Index#List, Index] = clientRuntime
+
   implicit def base[E, IL <: IndexList]: ClientRuntime[TNil, IL] = new ClientRuntime[TNil, IL] {
     override def injectQuery: UniqueIndexApi#ClientQuery ~> Lambda[a => Option[IL#ClientAlgebra[a]]] = Lambda[UniqueIndexApi#ClientQuery ~> Lambda[a => Option[IL#ClientAlgebra[a]]]] {
       _ => None
@@ -79,9 +81,9 @@ object ClientRuntime {
                        QI: CopK.Inject[T, IL#ClientAlgebra],
                        EA: UniqueIndexApi.ClientEventAux[E, I, U],
                        EI: Cop.Inject[U, IL#ClientEventAlgebra]
-                     ): ClientRuntime[I ::: L, IL] =
+                     ): ClientRuntime[I :: L, IL] =
 
-    new ClientRuntime[I ::: L, IL] {
+    new ClientRuntime[I :: L, IL] {
       override def injectQuery: UniqueIndexApi#ClientQuery ~> Lambda[a => Option[IL#ClientAlgebra[a]]] = Lambda[UniqueIndexApi#ClientQuery ~> Lambda[a => Option[IL#ClientAlgebra[a]]]] {
         c => QA.clientQueryRuntimeInject(QI)(c).orElse(L.injectQuery(c))
       }

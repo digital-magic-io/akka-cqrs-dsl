@@ -47,7 +47,8 @@ trait IndexExample extends EventSourcedPrograms {
   override type EntityIdType = String
 
   override type Environment = Unit
-  override type QueryAlgebra[A] = CopK[index1Api.UniqueIndexQuery ::: TNilK, A]
+  override type QueryList = index1Api.UniqueIndexQuery ::: TNilK
+  override type QueryAlgebra[A] = CopK[QueryList, A]
   override val algebraIsQuery: IsQuery[QueryAlgebra] = implicitly
 
   type Index = EmptyIndexList# + [index1Api.type]# + [index2Api.type]
@@ -153,8 +154,6 @@ case class IndexExampleActor(name: String, entityId: String)(implicit I1: Unique
   import IndexExample._
 
   context.setReceiveTimeout(1 seconds)
-
-  val z = genClientEventInterpreter(index1Api)
 
   implicit val index1QueryApi = I1.queryApiInterpreter(index1Api)
   override def interpreter: QueryAlgebra ~> LazyFuture = CopK.NaturalTransformation.summon

@@ -156,25 +156,9 @@ trait UniqueIndexApi {
   case class CommitRelease(entityId: EntityIdType, key: KeyType) extends UniqueIndexCommand[Unit]
   case class RollbackRelease(entityId: EntityIdType, key: KeyType) extends UniqueIndexCommand[Unit]
 
-  @deprecated("please use UniqueIndexQueryApi instead", "2.0.18")
-  trait QueryApi[Alg[A] <: CopK[_, A], Program[_]] {
-    this: ApiHelper[UniqueIndexQuery, Alg, Program] =>
-    def getEntityId(key: KeyType): Program[Option[EntityIdType]] = GetEntityId(key)
-    def getEntityIds(keys: Set[KeyType]): Program[Map[KeyType, EntityIdType]] = GetEntityIds(keys)
-  }
-
   class UniqueIndexQueryApi[Program[_]](implicit N: UniqueIndexQuery ~> Program) {
     def getEntityId(key: KeyType): Program[Option[EntityIdType]] = N(GetEntityId(key))
     def getEntityIds(keys: Set[KeyType]): Program[Map[KeyType, EntityIdType]] = N(GetEntityIds(keys))
-  }
-
-  @deprecated("please use IndexUpdateApi instead", "2.0.18")
-  trait UpdateApi[Alg[A] <: CopK[_, A], Program[_]] {
-    this: ApiHelper[IndexApiType, Alg, Program] =>
-    def acquire(key: KeyType): Program[Unit] = Acquire(Set(key))
-    def acquire(keys: Set[KeyType]): Program[Unit] = Acquire(keys)
-    def release(key: KeyType): Program[Unit] = Release(Set(key))
-    def release(keys: Set[KeyType]): Program[Unit] = Release(keys)
   }
 
   class IndexUpdateApi[Program[_]](implicit N: IndexApiType ~> Program) {
@@ -208,12 +192,6 @@ trait UniqueIndexApi {
   type LocalQueryType[T] >: LocalQuery[T] <: LocalQuery[T]
   sealed abstract class LocalQuery[T]
   case object GetMyEntries extends LocalQuery[Set[KeyType]]
-
-  @deprecated("please use IndexLocalQueryApi instead", "2.0.18")
-  trait LocalApi[Alg[A] <: CopK[_, A], Program[_]] {
-    this: ApiHelper[LocalQuery, Alg, Program] =>
-    def getMyEntries: Program[Set[KeyType]] = GetMyEntries
-  }
 
   class IndexLocalQueryApi[Program[_]](implicit N: LocalQuery ~> Program) {
     def getMyEntries: Program[Set[KeyType]] = N(GetMyEntries)

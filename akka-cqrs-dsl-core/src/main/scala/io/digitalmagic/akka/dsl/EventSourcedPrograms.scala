@@ -1,7 +1,7 @@
 package io.digitalmagic.akka.dsl
 
 import akka.event.LoggingAdapter
-import io.digitalmagic.coproduct.CopK
+import io.digitalmagic.coproduct.{CopK, TListK}
 import io.digitalmagic.akka.dsl.API.{Request, ResponseError}
 import scalaz._
 import Scalaz._
@@ -19,10 +19,11 @@ trait EventSourcedPrograms extends EventSourced {
   def getProgram: Request ~> MaybeProgram
   def processSnapshot(s: Any): Option[State]
 
-  protected type QueryAlgebra[A] <: CopK[_, A]
+  type QueryList <: TListK
+  type QueryAlgebra[A] = CopK[QueryList, A]
   protected val algebraIsQuery: IsQuery[QueryAlgebra]
 
-  protected type Index <: IndexList
+  type Index <: IndexList
   protected val clientRuntime: ClientRuntime[Index#List, Index]
 
   type TransientState
@@ -40,27 +41,12 @@ trait EventSourcedPrograms extends EventSourced {
   val indexFreeMonad: MonadFree[Program, Coyoneda[Index#Algebra, *]]
   val logWriterMonad: MonadTell[Program, Log]
 
-  @deprecated("This is not needed any more when using new Api classes", "2.0.18")
-  implicit val queryAlgebraNatDeprecated: QueryAlgebra ~> Program = Lambda[QueryAlgebra ~> Program] {
-    q => freeMonad.liftF(Coyoneda.lift(q))
-  }
-
   implicit def queryAlgebraNat[T[_]](implicit inj: CopK.Inject[T, QueryAlgebra]): T ~> Program = Lambda[T ~> Program] {
     q => freeMonad.liftF(Coyoneda.lift(inj(q)))
   }
 
-  @deprecated("This is not needed any more when using new Api classes", "2.0.18")
-  implicit val indexAlgebraNatDeprecated: Index#Algebra ~> Program = Lambda[Index#Algebra ~> Program] {
-    fa => indexFreeMonad.liftF(Coyoneda.lift(fa))
-  }
-
   implicit def indexAlgebraNat[T[_]](implicit inj: CopK.Inject[T, Index#Algebra]): T ~> Program = Lambda[T ~> Program] {
     fa => indexFreeMonad.liftF(Coyoneda.lift(inj(fa)))
-  }
-
-  @deprecated("This is not needed any more when using new Api classes", "2.0.18")
-  implicit val localAlgebraNatDeprecated: Index#LocalAlgebra ~> Program = Lambda[Index#LocalAlgebra ~> Program] {
-    fa => localIndexQueryMonad.liftF(Coyoneda.lift(fa))
   }
 
   implicit def localAlgebraNat[T[_]](implicit inj: CopK.Inject[T, Index#LocalAlgebra]): T ~> Program = Lambda[T ~> Program] {

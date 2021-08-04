@@ -19,21 +19,23 @@ object Dependencies {
   def scalaReflect(v: String): Seq[ModuleID] = Seq("org.scala-lang" % "scala-reflect" % v)
 
   val commonDependencies = Seq(
+    "org.scalaz"                 %% "scalaz-core"               % Versions.scalaz,
     "org.scalatest"              %% "scalatest"                 % Versions.scalaTest % Test,
     compilerPlugin("org.typelevel" % "kind-projector" % "0.13.0" cross CrossVersion.full)
   )
 
+  val coproductDependencies = libraryDependencies ++= commonDependencies ++ scalaVersion(sv => Dependencies.scalaReflect(sv)).value
+
   val coreDependencies = libraryDependencies ++= commonDependencies ++ Seq(
-    "org.scalaz"                 %% "scalaz-core"               % Versions.scalaz,
     "com.typesafe.akka"          %% "akka-actor"                % Versions.akka,
     "com.typesafe.akka"          %% "akka-persistence"          % Versions.akka,
     "com.typesafe.akka"          %% "akka-cluster-sharding"     % Versions.akka,
-    "com.typesafe.akka"          %% "akka-testkit"              % Versions.akka      % Test,
+    "com.typesafe.akka"          %% "akka-testkit"              % Versions.akka % Test,
     "org.specs2"                 %% "specs2-core"               % Versions.specs2Version % Test,
     "org.specs2"                 %% "specs2-scalacheck"         % Versions.specs2Version % Test,
     "org.scalacheck"             %% "scalacheck"                % Versions.scalacheckVersion % Test,
     "org.scalaz"                 %% "scalaz-scalacheck-binding" % Versions.scalaz % Test,
-  ) ++ scalaVersion(sv => Dependencies.scalaReflect(sv)).value
+  )
 
   val kryoDependencies = libraryDependencies ++= commonDependencies ++ Seq(
     "com.esotericsoftware"       %  "kryo"                       % Versions.kryoVersion,
