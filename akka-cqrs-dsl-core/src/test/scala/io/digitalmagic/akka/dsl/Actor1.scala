@@ -60,7 +60,8 @@ trait Actor1Programs extends EventSourcedPrograms {
 
   override type EntityIdType = Unit
 
-  override type QueryAlgebra[A] = CopK[TNilK, A]
+  override type QueryList = TNilK
+  override type QueryAlgebra[A] = CopK[QueryList, A]
   override val algebraIsQuery: IsQuery[QueryAlgebra] = implicitly
 
   override type Index = EmptyIndexList

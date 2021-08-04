@@ -12,14 +12,15 @@ val scala212Options = Seq(
   "-language:postfixOps",
   "-language:implicitConversions",
   "-language:higherKinds",
-  "-Ypartial-unification"
+  "-Ypartial-unification",
+  "-language:experimental.macros"
 )
 
 val scala213Options = scala212Options.filterNot(_ == "-Ypartial-unification")
 
 val buildSettings = Seq(
   organization := "io.digital-magic",
-  version      := "2.1.0",  // don't forget to bump version in .bintray.json
+  version      := "2.1.1",  // don't forget to bump version in .bintray.json
   Test / parallelExecution := false,
   scalaVersion       := Dependencies.Versions.scala_2_12,
   crossScalaVersions := Seq(Dependencies.Versions.scala_2_12, Dependencies.Versions.scala_2_13),
@@ -33,9 +34,14 @@ val buildSettings = Seq(
   )
 )
 
+lazy val coproduct = Project(id = "akka-cqrs-dsl-coproduct", base = file("akka-cqrs-dsl-coproduct"))
+  .settings(buildSettings)
+  .settings(Dependencies.coproductDependencies)
+
 lazy val core = Project(id = "akka-cqrs-dsl-core", base = file("akka-cqrs-dsl-core"))
   .settings(buildSettings)
   .settings(Dependencies.coreDependencies)
+  .dependsOn(coproduct)
 
 lazy val kryo = Project(id = "akka-cqrs-dsl-kryo", base = file("akka-cqrs-dsl-kryo"))
   .settings(buildSettings)
@@ -49,6 +55,7 @@ lazy val spray = Project(id = "akka-cqrs-dsl-spray", base = file("akka-cqrs-dsl-
 
 lazy val root = Project(id = "akka-cqrs-dsl", base = file("."))
   .settings(buildSettings)
+  .aggregate(coproduct)
   .aggregate(core)
   .aggregate(kryo)
   .aggregate(spray)

@@ -35,7 +35,7 @@ object CopK {
   }
 
   object Inject {
-    def apply[E[_], C[A] <: CopK[_, A]](implicit I: Inject[E, C]): Inject[E, C] = I
+    def apply[E[_], C[A] <: CopK[TListK, A]](implicit I: Inject[E, C]): Inject[E, C] = I
 
     implicit def injectKFromInjectL[E[_], L <: TListK](implicit I: InjectL[E, L]): Inject[E, CopK[L, *]] = new Inject[E, CopK[L, *]] {
       val inj: E ~> CopK[L, *] = Lambda[E ~> CopK[L, *]](I.inj(_))
