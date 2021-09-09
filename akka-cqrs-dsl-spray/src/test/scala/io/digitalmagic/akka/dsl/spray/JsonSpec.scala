@@ -4,9 +4,12 @@ import io.digitalmagic.akka.dsl.EventSourcedActorWithInterpreter.EventSourcedAct
 import io.digitalmagic.akka.dsl._
 import org.scalatest.{Matchers, WordSpecLike}
 import _root_.spray.json._
+import io.digitalmagic.akka.dsl.context.SerializedProgramContext
 
 object JsonSpec {
   import DefaultJsonProtocol._
+
+  implicit val serializedProgramContextJsonFormat: JsonFormat[SerializedProgramContext] = jsonFormat0(() => SerializedProgramContext())
 
   implicit object api1 extends UniqueIndexApi.Base[String, String]
   implicit object api2 extends UniqueIndexApi.Base[Int, Int]

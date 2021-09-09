@@ -14,6 +14,7 @@ object Dependencies {
     val specs2Version           = "4.7.0"
     val scalacheckVersion       = "1.14.0"
     val akkaKryoSerialization   = "1.1.5"
+    val openTelemetry           = "1.0.1"
   }
 
   def scalaReflect(v: String): Seq[ModuleID] = Seq("org.scala-lang" % "scala-reflect" % v)
@@ -25,6 +26,13 @@ object Dependencies {
   )
 
   val coproductDependencies = libraryDependencies ++= commonDependencies ++ scalaVersion(sv => Dependencies.scalaReflect(sv)).value
+
+  val contextDummyDependencies = libraryDependencies ++= commonDependencies
+
+  val contextOpenTelemetryDependencies = libraryDependencies ++= commonDependencies ++ Seq(
+    "io.opentelemetry"           % "opentelemetry-api"          % Versions.openTelemetry,
+    "io.opentelemetry"           % "opentelemetry-context"      % Versions.openTelemetry,
+  )
 
   val coreDependencies = libraryDependencies ++= commonDependencies ++ Seq(
     "com.typesafe.akka"          %% "akka-actor"                % Versions.akka,

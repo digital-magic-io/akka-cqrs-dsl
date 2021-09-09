@@ -169,7 +169,7 @@ trait UniqueIndexPrograms extends EventSourcedPrograms {
   }
 }
 
-case class UniqueIndexActorDef[I <: UniqueIndexApi](indexApi: I, name: String, passivateIn: FiniteDuration = 5 seconds, numberOfShards: Int = 100)(implicit I: UniqueIndexInterface[I]) {
+abstract class AbstractUniqueIndexActorDef[I <: UniqueIndexApi](indexApi: I, name: String, passivateIn: FiniteDuration = 5 seconds, numberOfShards: Int = 100)(implicit I: UniqueIndexInterface[I]) {
   def extractEntityId: ExtractEntityId = {
     case msg: indexApi.ConcreteUniqueIndexRequest[_] => (indexApi.keyToString.asString(msg.key), msg)
   }
@@ -179,7 +179,7 @@ case class UniqueIndexActorDef[I <: UniqueIndexApi](indexApi: I, name: String, p
   }
 
   def props(entityId: String): Props =
-    Props(UniqueIndexActor(indexApi, name, entityId, passivateIn)(I))
+    Props(construct(indexApi, name, entityId, passivateIn)(I))
 
   def start(clusterSharding: ClusterSharding, settings: ClusterShardingSettings): ActorRef = {
     clusterSharding.startProperly(
@@ -191,13 +191,16 @@ case class UniqueIndexActorDef[I <: UniqueIndexApi](indexApi: I, name: String, p
       handOffStopMessage = EventSourcedActorWithInterpreter.Stop
     )
   }
+
+  def construct(indexApi: I, name: String, entityId: String, passivateIn: FiniteDuration)(implicit I: UniqueIndexInterface[I]): AbstractUniqueIndexActor[I]
 }
 
-case class UniqueIndexActor[I <: UniqueIndexApi](indexApi: I, name: String, entityId: String, passivateIn: FiniteDuration = 5 seconds)(implicit I: UniqueIndexInterface[I]) extends UniqueIndexPrograms with EventSourcedActorWithInterpreter {
+abstract class AbstractUniqueIndexActor[I <: UniqueIndexApi](val indexApi: I, name: String, entityId: String, passivateIn: FiniteDuration = 5 seconds)(implicit I: UniqueIndexInterface[I]) extends UniqueIndexPrograms with EventSourcedActorWithInterpreter {
   import indexApi._
 
   context.setReceiveTimeout(passivateIn)
 
+  override type QueryList = ClientQuery ::: TNilK
   implicit val indexQuery = I.clientApiInterpreter(indexApi)
 
   override def interpreter: QueryAlgebra ~> LazyFuture = CopK.NaturalTransformation.summon

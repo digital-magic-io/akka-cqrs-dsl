@@ -20,7 +20,7 @@ val scala213Options = scala212Options.filterNot(_ == "-Ypartial-unification")
 
 val buildSettings = Seq(
   organization := "io.digital-magic",
-  version      := "2.1.1",  // don't forget to bump version in .bintray.json
+  version      := "2.2.0",
   Test / parallelExecution := false,
   scalaVersion       := Dependencies.Versions.scala_2_12,
   crossScalaVersions := Seq(Dependencies.Versions.scala_2_12, Dependencies.Versions.scala_2_13),
@@ -38,24 +38,37 @@ lazy val coproduct = Project(id = "akka-cqrs-dsl-coproduct", base = file("akka-c
   .settings(buildSettings)
   .settings(Dependencies.coproductDependencies)
 
+lazy val contextDummy = Project(id = "akka-cqrs-dsl-context-dummy", base = file("akka-cqrs-dsl-context-dummy"))
+  .settings(buildSettings)
+  .settings(Dependencies.contextDummyDependencies)
+
+lazy val contextOpenTelemetry = Project(id = "akka-cqrs-dsl-context-opentelemetry", base = file("akka-cqrs-dsl-context-opentelemetry"))
+  .settings(buildSettings)
+  .settings(Dependencies.contextOpenTelemetryDependencies)
+
 lazy val core = Project(id = "akka-cqrs-dsl-core", base = file("akka-cqrs-dsl-core"))
   .settings(buildSettings)
   .settings(Dependencies.coreDependencies)
   .dependsOn(coproduct)
+  .dependsOn(contextDummy % Provided)
 
 lazy val kryo = Project(id = "akka-cqrs-dsl-kryo", base = file("akka-cqrs-dsl-kryo"))
   .settings(buildSettings)
   .settings(Dependencies.kryoDependencies)
   .dependsOn(core)
+  .dependsOn(contextDummy % Provided)
 
 lazy val spray = Project(id = "akka-cqrs-dsl-spray", base = file("akka-cqrs-dsl-spray"))
   .settings(buildSettings)
   .settings(Dependencies.sprayDependencies)
   .dependsOn(core)
+  .dependsOn(contextDummy % Provided)
 
 lazy val root = Project(id = "akka-cqrs-dsl", base = file("."))
   .settings(buildSettings)
   .aggregate(coproduct)
+  .aggregate(contextDummy)
+  .aggregate(contextOpenTelemetry)
   .aggregate(core)
   .aggregate(kryo)
   .aggregate(spray)

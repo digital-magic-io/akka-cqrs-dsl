@@ -7,6 +7,7 @@ import io.digitalmagic.coproduct.{Cop, CopK, TCons, TNil, TNilK}
 import io.digitalmagic.akka.dsl
 import io.digitalmagic.akka.dsl.API._
 import io.digitalmagic.akka.dsl.EventSourcedActorWithInterpreter.IndexFuture
+import io.digitalmagic.akka.dsl.context.ProgramContextOps
 import scalaz._
 import scalaz.Scalaz._
 
@@ -47,6 +48,8 @@ trait IndexExample extends EventSourcedPrograms {
   override type EntityIdType = String
 
   override type Environment = Unit
+  override val contextOps: ProgramContextOps = new ProgramContextOps
+
   override type QueryList = index1Api.UniqueIndexQuery ::: TNilK
   override type QueryAlgebra[A] = CopK[QueryList, A]
   override val algebraIsQuery: IsQuery[QueryAlgebra] = implicitly

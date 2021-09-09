@@ -6,6 +6,7 @@ import io.digitalmagic.coproduct.TListK.:::
 import io.digitalmagic.coproduct.{Cop, CopK, TNilK}
 import io.digitalmagic.akka.dsl.API._
 import io.digitalmagic.akka.dsl.EventSourcedActorWithInterpreter.IndexFuture
+import io.digitalmagic.akka.dsl.context.ProgramContextOps
 import scalaz._
 import scalaz.Scalaz._
 
@@ -39,6 +40,7 @@ trait AdderPrograms extends EventSourcedPrograms {
   import Adder._
 
   override type Environment = Unit
+  override val contextOps: ProgramContextOps = new ProgramContextOps
 
   override type EntityIdType = Unit
 

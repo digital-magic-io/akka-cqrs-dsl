@@ -50,7 +50,7 @@ class UniqueIndexActorSpec(system: ActorSystem) extends TestKit(system) with Imp
 
   implicit val index = new ActorBasedUniqueIndex[myIndexApi.type](system.actorSelection("user/entity"), system.actorSelection("system/sharding/index"))
   private val clusterSharding = ClusterSharding(system)
-  private val indexActor = UniqueIndexActorDef(myIndexApi, "index").start(clusterSharding, ClusterShardingSettings(system))
+  private val indexActor = TestUniqueIndexActorDef(myIndexApi, "index").start(clusterSharding, ClusterShardingSettings(system))
 
   "index actor" must {
     import myIndexApi._
