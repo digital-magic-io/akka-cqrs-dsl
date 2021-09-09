@@ -5,6 +5,7 @@ import akka.cluster.sharding.ShardRegion.Passivate
 import akka.event.{Logging, LoggingAdapter}
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotMetadata, SnapshotOffer}
 import io.digitalmagic.akka.dsl.API._
+import io.digitalmagic.akka.dsl.context.{ProgramContext, SerializedProgramContext}
 import scalaz._
 import scalaz.syntax.invariantFunctor._
 import scalaz.Scalaz._
@@ -68,7 +69,7 @@ object EventSourcedActorWithInterpreter {
     def apply[I <: UniqueIndexApi](api: I)(key: api.KeyType, commit: () => Unit, commitEvent: Option[api.ClientEventType], rollback: () => Unit, rollbackEvent: Option[api.ClientEventType]): IndexPostActions =
       IndexPostActions(Map(IndexPostActionKey(api)(key) -> LastVal(IndexPostAction(commit, commitEvent, rollback, rollbackEvent))))
 
-    def commitAcquisition[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: IndexInterface[I]): IndexPostActions =
+    def commitAcquisition[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: IndexInterface[I], context: SerializedProgramContext): IndexPostActions =
       IndexPostActions(api)(key,
         () => A.lowLevelApi(api).commitAcquisition(entityId, key),
         Some(api.AcquisitionCompletedClientEvent(key)),
@@ -76,7 +77,7 @@ object EventSourcedActorWithInterpreter {
         Some(api.AcquisitionAbortedClientEvent(key))
       )
 
-    def rollbackAcquisition[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: IndexInterface[I]): IndexPostActions =
+    def rollbackAcquisition[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: IndexInterface[I], context: SerializedProgramContext): IndexPostActions =
       IndexPostActions(api)(key,
         () => A.lowLevelApi(api).rollbackAcquisition(entityId, key),
         Some(api.AcquisitionAbortedClientEvent(key)),
@@ -84,7 +85,7 @@ object EventSourcedActorWithInterpreter {
         Some(api.AcquisitionAbortedClientEvent(key))
       )
 
-    def commitRelease[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: IndexInterface[I]): IndexPostActions =
+    def commitRelease[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: IndexInterface[I], context: SerializedProgramContext): IndexPostActions =
       IndexPostActions(api)(key,
         () => A.lowLevelApi(api).commitRelease(entityId, key),
         Some(api.ReleaseCompletedClientEvent(key)),
@@ -92,7 +93,7 @@ object EventSourcedActorWithInterpreter {
         Some(api.ReleaseAbortedClientEvent(key))
       )
 
-    def rollbackRelease[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: IndexInterface[I]): IndexPostActions =
+    def rollbackRelease[I <: UniqueIndexApi, T[_], E](api: UniqueIndexApi.IndexApiAux[E, I, T])(entityId: E, key: api.KeyType)(implicit A: IndexInterface[I], context: SerializedProgramContext): IndexPostActions =
       IndexPostActions(api)(key,
         () => A.lowLevelApi(api).rollbackRelease(entityId, key),
         Some(api.ReleaseAbortedClientEvent(key)),
@@ -119,7 +120,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
   type LocalT[M[_], T] = FreeT[LocalY, M, T]
   type Result[T] = ResponseError \/ (LocalY[LocalT[EitherT[ResponseError, IndexT[QueryT[Logger, *], *], *], (TransientState, (Events, T, State))]] \/ (TransientState, (Events, T, State)))
 
-  type Program[A] = RWST[Environment, Events, State, StateT[TransientState, LocalT[EitherT[ResponseError, IndexT[QueryT[Logger, *], *], *], *], *], A]
+  type Program[A] = RWST[(ProgramContext, Environment), Events, State, StateT[TransientState, LocalT[EitherT[ResponseError, IndexT[QueryT[Logger, *], *], *], *], *], A]
 
   override lazy val programMonad: Monad[Program] = Monad[Program](rwstMonadTell)
 
@@ -127,7 +128,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
   private type QueryStep[T] = QueryT[Logger, IndexY[IndexStep[T]] \/ Result[T]]
   private type StepResult[T] = Identity[(Log, QueryY[QueryStep[T]] \/ (IndexY[IndexStep[T]] \/ Result[T]))]
 
-  override lazy val environmentReaderMonad: MonadReader[Program, Environment] = MonadReader[Program, Environment]
+  override lazy val environmentReaderMonad: MonadReader[Program, (ProgramContext, Environment)] = MonadReader[Program, (ProgramContext, Environment)]
   override lazy val eventWriterMonad: MonadTell[Program, Events] = MonadTell[Program, Events]
   override lazy val stateMonad: MonadState[Program, State] = MonadState[Program, State]
   override lazy val transientStateMonad: MonadState[Program, TransientState] = MonadState[Program, TransientState]
@@ -279,16 +280,16 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
                                                          A: IndexInterface[I]): T ~> IndexFuture = new (T ~> IndexFuture) {
 
     override def apply[A](fa: T[A]): IndexFuture[A] = api.castIndexApi(fa) match {
-      case api.Acquire(keys) =>
+      case c@api.Acquire(keys) =>
         val (events, indexPostActions) = keys.toList.foldMap {
           key => state.indexesState.get(api).flatMap(_.get(key)) match {
             case None | Some(api.AcquisitionPendingClientState()) =>
               // not yet acquired
               // or acquisition has been started, in this case re-acquire because previous attempt could fail with duplicate key, but that has not been reflected in our state
-              (List(api.AcquisitionStartedClientEvent(key)), IndexPostActions.commitAcquisition(api)(entityId, key))
+              (List(api.AcquisitionStartedClientEvent(key)), IndexPostActions.commitAcquisition(api)(entityId, key)(A, c.context))
             case Some(api.ReleasePendingClientState()) =>
               // release has been started, so roll it back
-              (List(), IndexPostActions.rollbackRelease(api)(entityId, key))
+              (List(), IndexPostActions.rollbackRelease(api)(entityId, key)(A, c.context))
             case Some(api.AcquiredClientState()) =>
               // already acquired
               (List(), IndexPostActions.empty)
@@ -300,27 +301,27 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
             processIndexEvent(event)
           },
           completion = { _ =>
-            events.traverse(e => A.lowLevelApi(api).startAcquisition(entityId, e.key)(dispatcher)) onComplete {
+            events.traverse(e => A.lowLevelApi(api).startAcquisition(entityId, e.key)(c.context)(dispatcher)) onComplete {
               case TrySuccess(_) => p.success((f => f(), indexPostActions, \/-(())))
               case TryFailure(cause) => p.success((f => f(), indexPostActions, -\/(cause)))
             }
           }
         )
         p.future
-      case api.Release(keys) =>
+      case c@api.Release(keys) =>
         val (events, indexPostActions) = keys.toList.foldMap {
           key => state.indexesState.get(api).flatMap(_.get(key)) match {
             case None => // not yet acquired
               (List(), IndexPostActions.empty)
             case Some(api.AcquisitionPendingClientState()) => // acquisition has been started, so roll it back
-              (List(), IndexPostActions.rollbackAcquisition(api)(entityId, key))
+              (List(), IndexPostActions.rollbackAcquisition(api)(entityId, key)(A, c.context))
             case Some(api.ReleasePendingClientState()) => // release has been started
-              (List(), IndexPostActions.commitRelease(api)(entityId, key))
+              (List(), IndexPostActions.commitRelease(api)(entityId, key)(A, c.context))
             case Some(api.AcquiredClientState()) => // already acquired
-              (List(api.ReleaseStartedClientEvent(key)), IndexPostActions.commitRelease(api)(entityId, key))
+              (List(api.ReleaseStartedClientEvent(key)), IndexPostActions.commitRelease(api)(entityId, key)(A, c.context))
           }
         }
-        events.traverse(e => A.lowLevelApi(api).startRelease(entityId, e.key)(dispatcher)) map { _ =>
+        events.traverse(e => A.lowLevelApi(api).startRelease(entityId, e.key)(c.context)(dispatcher)) map { _ =>
           ((f: () => Unit) => {
             persistEvents(events)(
               handler = { event => processIndexEvent(event) },
@@ -338,17 +339,17 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
   private trait NextStep {
     type T
     val request: Request[T]
-    val environment: Environment
+    val context: ProgramContext
     def resume: StepResult[T]
     def continuation: (() => Unit) => Unit
     def postActions: IndexPostActions
     def nextIndexStep(continuation: (() => Unit) => Unit, post: IndexPostActions, rest: IndexStep[T]): NextStep =
-      NextStep(request, environment, continuation, postActions |+| post, rest)
+      NextStep(request, context, continuation, postActions |+| post, rest)
 
     def nextQueryStep(next: QueryStep[T]): NextStep = new NextStep with NoSerializationVerificationNeeded {
       override type T = NextStep.this.T
       override val request: Request[T] = NextStep.this.request
-      override val environment: Environment = NextStep.this.environment
+      override val context: ProgramContext = NextStep.this.context
       override def resume: StepResult[T] = next.resume.run
       override def continuation: (() => Unit) => Unit = f => f()
       override def postActions: IndexPostActions = NextStep.this.postActions
@@ -356,17 +357,17 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
   }
 
   private object NextStep {
-    def apply[U](r: Request[U], env: Environment, c: (() => Unit) => Unit, post: IndexPostActions, s: IndexStep[U]): NextStep = new NextStep with NoSerializationVerificationNeeded {
+    def apply[U](r: Request[U], ctx: ProgramContext, c: (() => Unit) => Unit, post: IndexPostActions, s: IndexStep[U]): NextStep = new NextStep with NoSerializationVerificationNeeded {
       override type T = U
       override val request: Request[T] = r
-      override val environment: Environment = env
+      override val context: ProgramContext = ctx
       override def resume: StepResult[T] = s.resume.resume.run
       override def continuation: (() => Unit) => Unit = c
       override def postActions: IndexPostActions = post
     }
   }
 
-  private case class FailStep[U](rollbackActions: IndexPostActions, request: Request[U], error: Throwable) extends NoSerializationVerificationNeeded
+  private case class FailStep[U](rollbackActions: IndexPostActions, context: ProgramContext, request: Request[U], error: Throwable) extends NoSerializationVerificationNeeded
 
   def interpretStep(step: NextStep): Unit = {
     step.continuation { () =>
@@ -376,12 +377,14 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
       programRes match {
         case \/-(\/-(-\/(error))) =>
           rollback(true, step.postActions)
+          closeContext(step.context, Some(error.getMessage))
           sender() ! step.request.failure(error)
 
         case \/-(\/-(\/-(\/-((newTransientState, (events, result, newState)))))) =>
           commit(events, step.postActions) { () =>
             state = state.copy(underlying = newState)
             transientState = newTransientState
+            closeContext(step.context, None)
             sender() ! step.request.success(result)
           }
 
@@ -392,8 +395,8 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
           val replyTo = sender()
           idx.trans(indexInterpreter).run onComplete {
             case scala.util.Success((cont, postActions, \/-(res))) => self.tell(step.nextIndexStep(cont, postActions, res), replyTo)
-            case scala.util.Success((_, postActions, -\/(err))) => self.tell(FailStep(step.postActions |+| postActions, step.request, err), replyTo)
-            case scala.util.Failure(err) => self.tell(FailStep(step.postActions, step.request, err), replyTo)
+            case scala.util.Success((_, postActions, -\/(err))) => self.tell(FailStep(step.postActions |+| postActions, step.context, step.request, err), replyTo)
+            case scala.util.Failure(err) => self.tell(FailStep(step.postActions, step.context, step.request, err), replyTo)
           }
 
         case -\/(ex) =>
@@ -401,19 +404,20 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
           val queryFuture = ex.trans(interpreter).run
           queryFuture(dispatcher) onComplete {
             case scala.util.Success(rest) => self.tell(step.nextQueryStep(rest), replyTo)
-            case scala.util.Failure(err) => self.tell(FailStep(step.postActions, step.request, err), replyTo)
+            case scala.util.Failure(err) => self.tell(FailStep(step.postActions, step.context, step.request, err), replyTo)
           }
       }
     }
   }
 
-  private def interpret[T](r: Request[T], environment: Environment, program: Program[T]): Unit =
-    interpretStep(NextStep(r, environment, f => f(), IndexPostActions.empty, program.run(environment, state.underlying).run(transientState).resume.run))
+  private def interpret[T](r: Request[T], context: ProgramContext, environment: Environment, program: Program[T]): Unit =
+    interpretStep(NextStep(r, context, f => f(), IndexPostActions.empty, program.run((context, environment), state.underlying).run(transientState).resume.run))
 
   private def processNextStep: Receive = {
     case nextStep: NextStep => interpretStep(nextStep)
-    case FailStep(rollbackActions, request, error) =>
+    case FailStep(rollbackActions, context, request, error) =>
       rollback(true, rollbackActions)
+      closeContext(context, Some(error.getMessage))
       error match {
         case e: ResponseError => sender() ! request.failure(e)
         case e                => sender() ! request.failure(InternalError(e))
@@ -443,21 +447,36 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
       passivate()
   }
 
+  private val classNamePattern = """.*?(\w+)\$?\z""".r
+  private def startNewContext(r: Request[_]): ProgramContext = {
+    val classNamePattern(name) = r.getClass.getName
+    r match {
+      case r: HasContext => contextOps.startSubContext(r.context, name)
+      case _ => contextOps.emptyContext(name)
+    }
+  }
+
+  private def closeContext(context: ProgramContext, error: Option[String]): Unit = {
+    contextOps.closeContext(context, error)
+  }
+
   private def processIsIndexNeeded: Receive = {
     case q: UniqueIndexApi#ClientQuery[_] =>
+      val context = startNewContext(q)
       clientRuntime.injectQuery(q) match {
         case Some(query) =>
           clientApiInterpreter(query)
         case None =>
           logger.warning(s"unknown client api query: $q")
       }
+      closeContext(context, None)
   }
 
   private def interpretRequest: Receive = {
     case request: Request[_] if getProgram(request).isDefined => getProgram(request) match {
       case Some(program) =>
         activateStashingBehaviour()
-        interpret(request, getEnvironment(request), program)
+        interpret(request, startNewContext(request), getEnvironment(request), program)
       case None =>
         sys.error("should not happen")
     }

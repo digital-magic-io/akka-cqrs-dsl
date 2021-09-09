@@ -1,10 +1,10 @@
 package io.digitalmagic.akka.dsl.javaserialization
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
-
 import io.digitalmagic.akka.dsl.EventSourcedActorWithInterpreter.EventSourcedActorState
 import io.digitalmagic.akka.dsl.{ClientIndexesStateMap, Event, PersistentState, UniqueIndexApi}
 import org.scalatest.{Matchers, WordSpecLike}
+
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 
 object JavaSerializationSpec {
   case object test

@@ -233,8 +233,8 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
       val clusterShardingSettings = ClusterShardingSettings(system)
       val shardAllocationStrategy = clusterSharding.defaultShardAllocationStrategy(clusterShardingSettings)
 
-      UniqueIndexActorDef(index1Api, "index1").start(clusterSharding, clusterShardingSettings)
-      UniqueIndexActorDef(index2Api, "index2").start(clusterSharding, clusterShardingSettings)
+      TestUniqueIndexActorDef(index1Api, "index1").start(clusterSharding, clusterShardingSettings)
+      TestUniqueIndexActorDef(index2Api, "index2").start(clusterSharding, clusterShardingSettings)
 
       clusterSharding.startProperly(
         typeName = "example",
@@ -276,8 +276,8 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
       val clusterShardingSettings = ClusterShardingSettings(system)
       val shardAllocationStrategy = clusterSharding.defaultShardAllocationStrategy(clusterShardingSettings)
 
-      UniqueIndexActorDef(index1Api, "index1-batch").start(clusterSharding, clusterShardingSettings)
-      UniqueIndexActorDef(index2Api, "index2-batch").start(clusterSharding, clusterShardingSettings)
+      TestUniqueIndexActorDef(index1Api, "index1-batch").start(clusterSharding, clusterShardingSettings)
+      TestUniqueIndexActorDef(index2Api, "index2-batch").start(clusterSharding, clusterShardingSettings)
 
       clusterSharding.startProperly(
         typeName = "example-batch",
@@ -319,8 +319,8 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
       val clusterShardingSettings = ClusterShardingSettings(system)
       val shardAllocationStrategy = clusterSharding.defaultShardAllocationStrategy(clusterShardingSettings)
 
-      UniqueIndexActorDef(index1Api, "index1-2").start(clusterSharding, clusterShardingSettings)
-      UniqueIndexActorDef(index2Api, "index2-2").start(clusterSharding, clusterShardingSettings)
+      TestUniqueIndexActorDef(index1Api, "index1-2").start(clusterSharding, clusterShardingSettings)
+      TestUniqueIndexActorDef(index2Api, "index2-2").start(clusterSharding, clusterShardingSettings)
 
       clusterSharding.startProperly(
         typeName = "example-2",
@@ -389,8 +389,8 @@ class DSLSpec(system: ActorSystem) extends TestKit(system) with ImplicitSender w
       val clusterShardingSettings = ClusterShardingSettings(system)
       val shardAllocationStrategy = clusterSharding.defaultShardAllocationStrategy(clusterShardingSettings)
 
-      UniqueIndexActorDef(index1Api, "index1-3").start(clusterSharding, clusterShardingSettings)
-      UniqueIndexActorDef(index2Api, "index2-3").start(clusterSharding, clusterShardingSettings)
+      TestUniqueIndexActorDef(index1Api, "index1-3").start(clusterSharding, clusterShardingSettings)
+      TestUniqueIndexActorDef(index2Api, "index2-3").start(clusterSharding, clusterShardingSettings)
 
       clusterSharding.startProperly(
         typeName = "example-3",

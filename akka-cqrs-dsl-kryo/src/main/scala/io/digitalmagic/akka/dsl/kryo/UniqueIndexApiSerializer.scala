@@ -1,11 +1,11 @@
 package io.digitalmagic.akka.dsl.kryo
 
-import java.time.Instant
-
 import com.esotericsoftware.kryo.io.{Input, Output}
 import com.esotericsoftware.kryo.{Kryo, KryoException, Serializer}
+import io.digitalmagic.akka.dsl.context.SerializedProgramContext
 import io.digitalmagic.akka.dsl.{ClientIndexesStateMap, UniqueIndexApi}
 
+import java.time.Instant
 import scala.reflect.runtime.universe.Mirror
 
 class ApiSerializer(mirror: Mirror) extends Serializer[UniqueIndexApi] {
@@ -21,6 +21,7 @@ class ApiSerializer(mirror: Mirror) extends Serializer[UniqueIndexApi] {
 trait Helper {
   def readEntityId(kryo: Kryo, input: Input, api: UniqueIndexApi): api.EntityIdType = kryo.readClassAndObject(input).asInstanceOf[api.EntityIdType]
   def readKey(kryo: Kryo, input: Input, api: UniqueIndexApi): api.KeyType = kryo.readClassAndObject(input).asInstanceOf[api.KeyType]
+  def readContext(kryo: Kryo, input: Input, api: UniqueIndexApi): SerializedProgramContext = kryo.readClassAndObject(input).asInstanceOf[SerializedProgramContext]
 }
 
 class ClientEventSerializer(apiSerializer: ApiSerializer) extends Serializer[UniqueIndexApi#ClientEvent] with Helper {
@@ -286,33 +287,40 @@ class UniqueIndexRequestSerializer(apiSerializer: ApiSerializer) extends Seriali
     import obj.Api._
     kryo.writeObject(output, obj.Api, apiSerializer)
     obj.reflect match {
-      case GetEntityId(key) =>
+      case c@GetEntityId(key) =>
         output.writeString(GetEntityIdName)
         kryo.writeClassAndObject(output, key)
-      case StartAcquisition(entityId, key) =>
+        kryo.writeClassAndObject(output, c.context)
+      case c@StartAcquisition(entityId, key) =>
         output.writeString(StartAcquisitionName)
         kryo.writeClassAndObject(output, entityId)
         kryo.writeClassAndObject(output, key)
-      case CommitAcquisition(entityId, key) =>
+        kryo.writeClassAndObject(output, c.context)
+      case c@CommitAcquisition(entityId, key) =>
         output.writeString(CommitAcquisitionName)
         kryo.writeClassAndObject(output, entityId)
         kryo.writeClassAndObject(output, key)
-      case RollbackAcquisition(entityId, key) =>
+        kryo.writeClassAndObject(output, c.context)
+      case c@RollbackAcquisition(entityId, key) =>
         output.writeString(RollbackAcquisitionName)
         kryo.writeClassAndObject(output, entityId)
         kryo.writeClassAndObject(output, key)
-      case StartRelease(entityId, key) =>
+        kryo.writeClassAndObject(output, c.context)
+      case c@StartRelease(entityId, key) =>
         output.writeString(StartReleaseName)
         kryo.writeClassAndObject(output, entityId)
         kryo.writeClassAndObject(output, key)
-      case CommitRelease(entityId, key) =>
+        kryo.writeClassAndObject(output, c.context)
+      case c@CommitRelease(entityId, key) =>
         output.writeString(CommitReleaseName)
         kryo.writeClassAndObject(output, entityId)
         kryo.writeClassAndObject(output, key)
-      case RollbackRelease(entityId, key) =>
+        kryo.writeClassAndObject(output, c.context)
+      case c@RollbackRelease(entityId, key) =>
         output.writeString(RollbackReleaseName)
         kryo.writeClassAndObject(output, entityId)
         kryo.writeClassAndObject(output, key)
+        kryo.writeClassAndObject(output, c.context)
     }
   }
 
@@ -322,30 +330,37 @@ class UniqueIndexRequestSerializer(apiSerializer: ApiSerializer) extends Seriali
     input.readString() match {
       case GetEntityIdName =>
         val key = readKey(kryo, input, api)
+        implicit val context = readContext(kryo, input, api)
         GetEntityId(key)
       case StartAcquisitionName =>
         val entityId = readEntityId(kryo, input, api)
         val key = readKey(kryo, input, api)
+        implicit val context = readContext(kryo, input, api)
         StartAcquisition(entityId, key)
       case CommitAcquisitionName =>
         val entityId = readEntityId(kryo, input, api)
         val key = readKey(kryo, input, api)
+        implicit val context = readContext(kryo, input, api)
         CommitAcquisition(entityId, key)
       case RollbackAcquisitionName =>
         val entityId = readEntityId(kryo, input, api)
         val key = readKey(kryo, input, api)
+        implicit val context = readContext(kryo, input, api)
         RollbackAcquisition(entityId, key)
       case StartReleaseName =>
         val entityId = readEntityId(kryo, input, api)
         val key = readKey(kryo, input, api)
+        implicit val context = readContext(kryo, input, api)
         StartRelease(entityId, key)
       case CommitReleaseName =>
         val entityId = readEntityId(kryo, input, api)
         val key = readKey(kryo, input, api)
+        implicit val context = readContext(kryo, input, api)
         CommitRelease(entityId, key)
       case RollbackReleaseName =>
         val entityId = readEntityId(kryo, input, api)
         val key = readKey(kryo, input, api)
+        implicit val context = readContext(kryo, input, api)
         RollbackRelease(entityId, key)
       case other => throw new KryoException(s"Unknown request type: $other")
     }

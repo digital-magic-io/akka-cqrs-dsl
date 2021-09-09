@@ -1,10 +1,10 @@
 package io.digitalmagic.akka.dsl
 
 import java.time.Instant
-
 import akka.actor.{ActorRef, ActorSelection}
 import io.digitalmagic.coproduct.{Cop, CopK}
 import io.digitalmagic.akka.dsl.API._
+import io.digitalmagic.akka.dsl.context.SerializedProgramContext
 import scalaz._
 import scalaz.Scalaz._
 
@@ -115,9 +115,9 @@ trait UniqueIndexApi {
   }
 
   type IndexApiType[T] >: IndexApi[T] <: IndexApi[T]
-  sealed trait IndexApi[T]
-  case class Acquire(keys: Set[KeyType]) extends IndexApi[Unit]
-  case class Release(keys: Set[KeyType]) extends IndexApi[Unit]
+  sealed trait IndexApi[T] extends HasContext
+  case class Acquire(keys: Set[KeyType])(implicit val context: SerializedProgramContext) extends IndexApi[Unit]
+  case class Release(keys: Set[KeyType])(implicit val context: SerializedProgramContext) extends IndexApi[Unit]
   def castIndexApi[T](v: IndexApiType[T]): IndexApi[T] = v
 
   sealed abstract class Error extends ResponseError with ApiAsset {
@@ -137,7 +137,7 @@ trait UniqueIndexApi {
     override def getMessage: String = s"${Api}.EntityIdMismatch(${occupyingEntityId}, ${requestedEntityId}, ${key})"
   }
 
-  sealed trait UniqueIndexRequest[T] extends Request[T] with ApiAsset {
+  sealed trait UniqueIndexRequest[T] extends Request[T] with ApiAsset with HasContext {
     def reflect: Api.UniqueIndexRequest[T] = this
   }
   sealed abstract class ConcreteUniqueIndexRequest[T] extends UniqueIndexRequest[T] with ApiAsset {
@@ -146,47 +146,47 @@ trait UniqueIndexApi {
   }
   sealed trait UniqueIndexQuery[T] extends UniqueIndexRequest[T] with Query[T]
   sealed abstract class ConcreteUniqueIndexQuery[T] extends ConcreteUniqueIndexRequest[T] with UniqueIndexQuery[T]
-  case class GetEntityId(key: KeyType) extends ConcreteUniqueIndexQuery[Option[EntityIdType]]
-  case class GetEntityIds(keys: Set[KeyType]) extends UniqueIndexQuery[Map[KeyType, EntityIdType]]
+  case class GetEntityId(key: KeyType)(implicit val context: SerializedProgramContext) extends ConcreteUniqueIndexQuery[Option[EntityIdType]]
+  case class GetEntityIds(keys: Set[KeyType])(implicit val context: SerializedProgramContext) extends UniqueIndexQuery[Map[KeyType, EntityIdType]]
   sealed abstract class UniqueIndexCommand[T] extends ConcreteUniqueIndexRequest[T] with Command[T]
-  case class StartAcquisition(entityId: EntityIdType, key: KeyType) extends UniqueIndexCommand[Unit]
-  case class CommitAcquisition(entityId: EntityIdType, key: KeyType) extends UniqueIndexCommand[Unit]
-  case class RollbackAcquisition(entityId: EntityIdType, key: KeyType) extends UniqueIndexCommand[Unit]
-  case class StartRelease(entityId: EntityIdType, key: KeyType) extends UniqueIndexCommand[Unit]
-  case class CommitRelease(entityId: EntityIdType, key: KeyType) extends UniqueIndexCommand[Unit]
-  case class RollbackRelease(entityId: EntityIdType, key: KeyType) extends UniqueIndexCommand[Unit]
+  case class StartAcquisition(entityId: EntityIdType, key: KeyType)(implicit val context: SerializedProgramContext) extends UniqueIndexCommand[Unit]
+  case class CommitAcquisition(entityId: EntityIdType, key: KeyType)(implicit val context: SerializedProgramContext) extends UniqueIndexCommand[Unit]
+  case class RollbackAcquisition(entityId: EntityIdType, key: KeyType)(implicit val context: SerializedProgramContext) extends UniqueIndexCommand[Unit]
+  case class StartRelease(entityId: EntityIdType, key: KeyType)(implicit val context: SerializedProgramContext) extends UniqueIndexCommand[Unit]
+  case class CommitRelease(entityId: EntityIdType, key: KeyType)(implicit val context: SerializedProgramContext) extends UniqueIndexCommand[Unit]
+  case class RollbackRelease(entityId: EntityIdType, key: KeyType)(implicit val context: SerializedProgramContext) extends UniqueIndexCommand[Unit]
 
-  class UniqueIndexQueryApi[Program[_]](implicit N: UniqueIndexQuery ~> Program) {
-    def getEntityId(key: KeyType): Program[Option[EntityIdType]] = N(GetEntityId(key))
-    def getEntityIds(keys: Set[KeyType]): Program[Map[KeyType, EntityIdType]] = N(GetEntityIds(keys))
+  class UniqueIndexQueryApi[Program[_]: Monad](implicit N: UniqueIndexQuery ~> Program, retrieveContext: Program[SerializedProgramContext]) {
+    def getEntityId(key: KeyType): Program[Option[EntityIdType]] = retrieveContext >>= { implicit ctx => N(GetEntityId(key)) }
+    def getEntityIds(keys: Set[KeyType]): Program[Map[KeyType, EntityIdType]] = retrieveContext >>= { implicit ctx =>  N(GetEntityIds(keys)) }
   }
 
-  class IndexUpdateApi[Program[_]](implicit N: IndexApiType ~> Program) {
-    def acquire(key: KeyType): Program[Unit] = N(Acquire(Set(key)))
-    def acquire(keys: Set[KeyType]): Program[Unit] = N(Acquire(keys))
-    def release(key: KeyType): Program[Unit] = N(Release(Set(key)))
-    def release(keys: Set[KeyType]): Program[Unit] = N(Release(keys))
+  class IndexUpdateApi[Program[_]: Monad](implicit N: IndexApiType ~> Program, retrieveContext: Program[SerializedProgramContext]) {
+    def acquire(key: KeyType): Program[Unit] = retrieveContext >>= { implicit ctx => N(Acquire(Set(key))) }
+    def acquire(keys: Set[KeyType]): Program[Unit] = retrieveContext >>= { implicit ctx => N(Acquire(keys)) }
+    def release(key: KeyType): Program[Unit] = retrieveContext >>= { implicit ctx => N(Release(Set(key))) }
+    def release(keys: Set[KeyType]): Program[Unit] = retrieveContext >>= { implicit ctx => N(Release(keys)) }
   }
 
   trait LowLevelApi {
-    def startAcquisition(entityId: EntityIdType, key: KeyType): LazyFuture[Unit]
-    def commitAcquisition(entityId: EntityIdType, key: KeyType): Unit
-    def rollbackAcquisition(entityId: EntityIdType, key: KeyType): Unit
-    def startRelease(entityId: EntityIdType, key: KeyType): LazyFuture[Unit]
-    def commitRelease(entityId: EntityIdType, key: KeyType): Unit
-    def rollbackRelease(entityId: EntityIdType, key: KeyType): Unit
+    def startAcquisition(entityId: EntityIdType, key: KeyType)(implicit context: SerializedProgramContext): LazyFuture[Unit]
+    def commitAcquisition(entityId: EntityIdType, key: KeyType)(implicit context: SerializedProgramContext): Unit
+    def rollbackAcquisition(entityId: EntityIdType, key: KeyType)(implicit context: SerializedProgramContext): Unit
+    def startRelease(entityId: EntityIdType, key: KeyType)(implicit context: SerializedProgramContext): LazyFuture[Unit]
+    def commitRelease(entityId: EntityIdType, key: KeyType)(implicit context: SerializedProgramContext): Unit
+    def rollbackRelease(entityId: EntityIdType, key: KeyType)(implicit context: SerializedProgramContext): Unit
   }
 
   type ClientQueryType[T] >: ClientQuery[T] <: ClientQuery[T]
   // cannot be trait otherwise due to scala bug pattern matching does not work
-  sealed abstract class ClientQuery[T] extends Query[T] with ApiAsset {
+  sealed abstract class ClientQuery[T] extends Query[T] with ApiAsset with HasContext {
     def entityId: EntityIdType
     def reflect: Api.ClientQuery[T] = this
   }
-  case class IsIndexNeeded(entityId: EntityIdType, key: KeyType) extends ClientQuery[IsIndexNeededResponse]
+  case class IsIndexNeeded(entityId: EntityIdType, key: KeyType)(implicit val context: SerializedProgramContext) extends ClientQuery[IsIndexNeededResponse]
 
-  class ClientApi[Program[_]](implicit N: ClientQuery ~> Program) {
-    def isIndexNeeded(entityId: EntityIdType, key: KeyType): Program[IsIndexNeededResponse] = N(IsIndexNeeded(entityId, key))
+  class ClientApi[Program[_]: Monad](implicit N: ClientQuery ~> Program, retrieveContext: Program[SerializedProgramContext]) {
+    def isIndexNeeded(entityId: EntityIdType, key: KeyType): Program[IsIndexNeededResponse] = retrieveContext >>= { implicit ctx => N(IsIndexNeeded(entityId, key)) }
   }
 
   type LocalQueryType[T] >: LocalQuery[T] <: LocalQuery[T]
@@ -260,12 +260,12 @@ trait ActorBasedIndex[I <: UniqueIndexApi] extends IndexInterface[I] {
   }
 
   override def lowLevelApi(api: I): api.LowLevelApi = new api.LowLevelApi {
-    override def startAcquisition(entityId: api.EntityIdType, key: api.KeyType): LazyFuture[Unit] = indexActor.command(api.StartAcquisition(entityId, key))
-    override def commitAcquisition(entityId: api.EntityIdType, key: api.KeyType): Unit = indexActor.tell(api.CommitAcquisition(entityId, key), ActorRef.noSender)
-    override def rollbackAcquisition(entityId: api.EntityIdType, key: api.KeyType): Unit = indexActor.tell(api.RollbackAcquisition(entityId, key), ActorRef.noSender)
-    override def startRelease(entityId: api.EntityIdType, key: api.KeyType): LazyFuture[Unit] = indexActor.command(api.StartRelease(entityId, key))
-    override def commitRelease(entityId: api.EntityIdType, key: api.KeyType): Unit = indexActor.tell(api.CommitRelease(entityId, key), ActorRef.noSender)
-    override def rollbackRelease(entityId: api.EntityIdType, key: api.KeyType): Unit = indexActor.tell(api.RollbackRelease(entityId, key), ActorRef.noSender)
+    override def startAcquisition(entityId: api.EntityIdType, key: api.KeyType)(implicit context: SerializedProgramContext): LazyFuture[Unit] = indexActor.command(api.StartAcquisition(entityId, key))
+    override def commitAcquisition(entityId: api.EntityIdType, key: api.KeyType)(implicit context: SerializedProgramContext): Unit = indexActor.tell(api.CommitAcquisition(entityId, key), ActorRef.noSender)
+    override def rollbackAcquisition(entityId: api.EntityIdType, key: api.KeyType)(implicit context: SerializedProgramContext): Unit = indexActor.tell(api.RollbackAcquisition(entityId, key), ActorRef.noSender)
+    override def startRelease(entityId: api.EntityIdType, key: api.KeyType)(implicit context: SerializedProgramContext): LazyFuture[Unit] = indexActor.command(api.StartRelease(entityId, key))
+    override def commitRelease(entityId: api.EntityIdType, key: api.KeyType)(implicit context: SerializedProgramContext): Unit = indexActor.tell(api.CommitRelease(entityId, key), ActorRef.noSender)
+    override def rollbackRelease(entityId: api.EntityIdType, key: api.KeyType)(implicit context: SerializedProgramContext): Unit = indexActor.tell(api.RollbackRelease(entityId, key), ActorRef.noSender)
   }
 }
 
@@ -273,7 +273,7 @@ case class ActorBasedUniqueIndex[I <: UniqueIndexApi](entityActor: ActorSelectio
   override def queryApiInterpreter(api: I): api.UniqueIndexQuery ~> LazyFuture = {
     @inline def impl(api: UniqueIndexApi): api.UniqueIndexQuery ~> LazyFuture = Lambda[api.UniqueIndexQuery ~> LazyFuture] {
       case q: api.GetEntityId => indexActor query q
-      case api.GetEntityIds(keys) => keys.toList.traverse(k => indexActor.query(api.GetEntityId(k)).asFuture.map ((k, _))).map(_.collect{ case (k, Some(v)) => (k, v) }.toMap)
+      case q@api.GetEntityIds(keys) => keys.toList.traverse(k => indexActor.query(api.GetEntityId(k)(q.context)).asFuture.map ((k, _))).map(_.collect{ case (k, Some(v)) => (k, v) }.toMap)
     }
     impl(api)
   }

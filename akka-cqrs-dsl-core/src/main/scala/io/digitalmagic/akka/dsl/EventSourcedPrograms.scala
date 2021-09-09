@@ -5,6 +5,7 @@ import io.digitalmagic.coproduct.{CopK, TListK}
 import io.digitalmagic.akka.dsl.API.{Request, ResponseError}
 import scalaz._
 import Scalaz._
+import io.digitalmagic.akka.dsl.context.{ProgramContext, ProgramContextOps, SerializedProgramContext}
 
 trait EventSourcedPrograms extends EventSourced {
   type EntityIdType
@@ -12,6 +13,7 @@ trait EventSourcedPrograms extends EventSourced {
   type Events = Vector[EventType]
   type Log = Vector[LoggingAdapter => Unit]
   type Environment
+  val contextOps: ProgramContextOps
 
   type MaybeProgram[A] = Option[Program[A]]
 
@@ -31,7 +33,7 @@ trait EventSourcedPrograms extends EventSourced {
 
   type Program[_]
   implicit val programMonad: Monad[Program]
-  val environmentReaderMonad: MonadReader[Program, Environment]
+  val environmentReaderMonad: MonadReader[Program, (ProgramContext, Environment)]
   val eventWriterMonad: MonadTell[Program, Events]
   val stateMonad: MonadState[Program, State]
   val transientStateMonad: MonadState[Program, TransientState]
@@ -55,10 +57,17 @@ trait EventSourcedPrograms extends EventSourced {
 
   @inline def pure[A](v: A): Program[A] = programMonad.pure(v)
 
-  @inline def ask: Program[Environment] = environmentReaderMonad.ask
-  @inline def local[A](f: Environment => Environment)(fa: Program[A]): Program[A] = environmentReaderMonad.local(f)(fa)
-  @inline def scope[A](k: Environment)(fa: Program[A]): Program[A] = environmentReaderMonad.scope(k)(fa)
-  @inline def asks[A](f: Environment => A): Program[A] = environmentReaderMonad.asks(f)
+  @inline def ask: Program[Environment] = environmentReaderMonad.asks(_._2)
+  @inline def local[A](f: Environment => Environment)(fa: Program[A]): Program[A] = environmentReaderMonad.local(_.map(f))(fa)
+  @inline def scope[A](k: Environment)(fa: Program[A]): Program[A] = askContext >>= (c => environmentReaderMonad.scope((c, k))(fa))
+  @inline def asks[A](f: Environment => A): Program[A] = environmentReaderMonad.asks(p => f(p._2))
+
+  @inline implicit def askContext: Program[ProgramContext] = environmentReaderMonad.asks(_._1)
+  @inline def localContext[A](f: ProgramContext => ProgramContext)(fa: Program[A]): Program[A] = environmentReaderMonad.local(_.leftMap(f))(fa)
+  @inline def scopeContext[A](k: ProgramContext)(fa: Program[A]): Program[A] = ask >>= (e => environmentReaderMonad.scope((k, e))(fa))
+  @inline def asksContext[A](f: ProgramContext => A): Program[A] = environmentReaderMonad.asks(p => f(p._1))
+
+  @inline implicit def retrieveSerializedContext: Program[SerializedProgramContext] = asksContext(contextOps.serialize)
 
   @inline def writer[A](w: Events, v: A): Program[A] = eventWriterMonad.writer(w, v)
   @inline def tell(w: Events): Program[Unit] = eventWriterMonad.tell(w)

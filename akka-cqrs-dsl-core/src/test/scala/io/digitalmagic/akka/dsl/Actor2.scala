@@ -5,6 +5,7 @@ import akka.actor.{ActorSelection, Props}
 import io.digitalmagic.coproduct.{Cop, CopK, TNilK}
 import io.digitalmagic.akka.dsl.API._
 import io.digitalmagic.akka.dsl.EventSourcedActorWithInterpreter.IndexFuture
+import io.digitalmagic.akka.dsl.context.ProgramContextOps
 import scalaz._
 import scalaz.Scalaz._
 
@@ -42,6 +43,7 @@ trait Actor2Programs extends EventSourcedPrograms {
   import Actor2._
 
   override type Environment = Unit
+  override val contextOps: ProgramContextOps = new ProgramContextOps
 
   override type EventType = Actor2Event
   override lazy val eventTypeTag: ClassTag[Actor2Event] = implicitly

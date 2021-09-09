@@ -1,9 +1,10 @@
 package io.digitalmagic.akka.dsl.spray
 
-import java.time.Instant
-
+import io.digitalmagic.akka.dsl.context.SerializedProgramContext
 import io.digitalmagic.akka.dsl.{ClientIndexesStateMap, EventSourcedActorWithInterpreter, PersistentState, UniqueIndexApi}
 import spray.json._
+
+import java.time.Instant
 
 private object JsonHelper {
   import DefaultJsonProtocol._
@@ -24,47 +25,55 @@ private object JsonHelper {
     override def write(obj: api.KeyType): JsValue = JsString(api.keyToString.asString(obj))
   }
 
-  val AcquisitionStartedClientEventName   = "AcquisitionStartedClientEvent"
-  val AcquisitionCompletedClientEventName = "AcquisitionCompletedClientEvent"
-  val AcquisitionAbortedClientEventName   = "AcquisitionAbortedClientEvent"
-  val ReleaseStartedClientEventName       = "ReleaseStartedClientEvent"
-  val ReleaseCompletedClientEventName     = "ReleaseCompletedClientEvent"
-  val ReleaseAbortedClientEventName       = "ReleaseAbortedClientEvent"
+  object ClientEvents {
+    val AcquisitionStartedClientEventName   = "AcquisitionStartedClientEvent"
+    val AcquisitionCompletedClientEventName = "AcquisitionCompletedClientEvent"
+    val AcquisitionAbortedClientEventName   = "AcquisitionAbortedClientEvent"
+    val ReleaseStartedClientEventName       = "ReleaseStartedClientEvent"
+    val ReleaseCompletedClientEventName     = "ReleaseCompletedClientEvent"
+    val ReleaseAbortedClientEventName       = "ReleaseAbortedClientEvent"
 
-  @inline implicit def acquisitionStartedClientEventFormat[I <: UniqueIndexApi](implicit api: I):   RootJsonFormat[api.AcquisitionStartedClientEvent]   = jsonFormat1(api.AcquisitionStartedClientEvent)
-  @inline implicit def acquisitionCompletedClientEventFormat[I <: UniqueIndexApi](implicit api: I): RootJsonFormat[api.AcquisitionCompletedClientEvent] = jsonFormat1(api.AcquisitionCompletedClientEvent)
-  @inline implicit def acquisitionAbortedClientEventFormat[I <: UniqueIndexApi](implicit api: I):   RootJsonFormat[api.AcquisitionAbortedClientEvent]   = jsonFormat1(api.AcquisitionAbortedClientEvent)
-  @inline implicit def releaseStartedClientEventFormat[I <: UniqueIndexApi](implicit api: I):       RootJsonFormat[api.ReleaseStartedClientEvent]       = jsonFormat1(api.ReleaseStartedClientEvent)
-  @inline implicit def releaseCompletedClientEventFormat[I <: UniqueIndexApi](implicit api: I):     RootJsonFormat[api.ReleaseCompletedClientEvent]     = jsonFormat1(api.ReleaseCompletedClientEvent)
-  @inline implicit def releaseAbortedClientEventFormat[I <: UniqueIndexApi](implicit api: I):       RootJsonFormat[api.ReleaseAbortedClientEvent]       = jsonFormat1(api.ReleaseAbortedClientEvent)
+    @inline implicit def acquisitionStartedClientEventFormat[I <: UniqueIndexApi](implicit api: I):   RootJsonFormat[api.AcquisitionStartedClientEvent]   = jsonFormat1(api.AcquisitionStartedClientEvent)
+    @inline implicit def acquisitionCompletedClientEventFormat[I <: UniqueIndexApi](implicit api: I): RootJsonFormat[api.AcquisitionCompletedClientEvent] = jsonFormat1(api.AcquisitionCompletedClientEvent)
+    @inline implicit def acquisitionAbortedClientEventFormat[I <: UniqueIndexApi](implicit api: I):   RootJsonFormat[api.AcquisitionAbortedClientEvent]   = jsonFormat1(api.AcquisitionAbortedClientEvent)
+    @inline implicit def releaseStartedClientEventFormat[I <: UniqueIndexApi](implicit api: I):       RootJsonFormat[api.ReleaseStartedClientEvent]       = jsonFormat1(api.ReleaseStartedClientEvent)
+    @inline implicit def releaseCompletedClientEventFormat[I <: UniqueIndexApi](implicit api: I):     RootJsonFormat[api.ReleaseCompletedClientEvent]     = jsonFormat1(api.ReleaseCompletedClientEvent)
+    @inline implicit def releaseAbortedClientEventFormat[I <: UniqueIndexApi](implicit api: I):       RootJsonFormat[api.ReleaseAbortedClientEvent]       = jsonFormat1(api.ReleaseAbortedClientEvent)
+  }
 
-  val DuplicateIndexName = "DuplicateIndex"
-  val IndexIsFreeName = "IndexIsFree"
-  val IndexIsAcquiredName = "IndexIsAcquired"
-  val EntityIdMismatchName = "EntityIdMismatch"
+  object Errors {
+    val DuplicateIndexName = "DuplicateIndex"
+    val IndexIsFreeName = "IndexIsFree"
+    val IndexIsAcquiredName = "IndexIsAcquired"
+    val EntityIdMismatchName = "EntityIdMismatch"
 
-  @inline implicit def DuplicateIndexFormat[I <: UniqueIndexApi](implicit api: I):   RootJsonFormat[api.DuplicateIndex]   = jsonFormat2(api.DuplicateIndex)
-  @inline implicit def IndexIsFreeFormat[I <: UniqueIndexApi](implicit api: I):      RootJsonFormat[api.IndexIsFree]      = jsonFormat2(api.IndexIsFree)
-  @inline implicit def IndexIsAcquiredFormat[I <: UniqueIndexApi](implicit api: I):  RootJsonFormat[api.IndexIsAcquired]  = jsonFormat2(api.IndexIsAcquired)
-  @inline implicit def EntityIdMismatchFormat[I <: UniqueIndexApi](implicit api: I): RootJsonFormat[api.EntityIdMismatch] = jsonFormat3(api.EntityIdMismatch)
+    @inline implicit def DuplicateIndexFormat[I <: UniqueIndexApi](implicit api: I):   RootJsonFormat[api.DuplicateIndex]   = jsonFormat2(api.DuplicateIndex)
+    @inline implicit def IndexIsFreeFormat[I <: UniqueIndexApi](implicit api: I):      RootJsonFormat[api.IndexIsFree]      = jsonFormat2(api.IndexIsFree)
+    @inline implicit def IndexIsAcquiredFormat[I <: UniqueIndexApi](implicit api: I):  RootJsonFormat[api.IndexIsAcquired]  = jsonFormat2(api.IndexIsAcquired)
+    @inline implicit def EntityIdMismatchFormat[I <: UniqueIndexApi](implicit api: I): RootJsonFormat[api.EntityIdMismatch] = jsonFormat3(api.EntityIdMismatch)
+  }
 
-  val AcquisitionStartedServerEventName   = "AcquisitionStartedServerEvent"
-  val AcquisitionCompletedServerEventName = "AcquisitionCompletedServerEvent"
-  val ReleaseStartedServerEventName       = "ReleaseStartedServerEvent"
-  val ReleaseCompletedServerEventName     = "ReleaseCompletedServerEvent"
+  object ServerEvents {
+    val AcquisitionStartedServerEventName   = "AcquisitionStartedServerEvent"
+    val AcquisitionCompletedServerEventName = "AcquisitionCompletedServerEvent"
+    val ReleaseStartedServerEventName       = "ReleaseStartedServerEvent"
+    val ReleaseCompletedServerEventName     = "ReleaseCompletedServerEvent"
 
-  @inline implicit def acquisitionStartedServerEventFormat[I <: UniqueIndexApi](implicit api: I):   RootJsonFormat[api.AcquisitionStartedServerEvent]   = jsonFormat1(api.AcquisitionStartedServerEvent)
-  @inline implicit def acquisitionCompletedServerEventFormat[I <: UniqueIndexApi](implicit api: I): RootJsonFormat[api.AcquisitionCompletedServerEvent] = jsonFormat0(api.AcquisitionCompletedServerEvent)
-  @inline implicit def releaseStartedServerEventFormat[I <: UniqueIndexApi](implicit api: I):       RootJsonFormat[api.ReleaseStartedServerEvent]       = jsonFormat0(api.ReleaseStartedServerEvent)
-  @inline implicit def releaseCompletedServerEventFormat[I <: UniqueIndexApi](implicit api: I):     RootJsonFormat[api.ReleaseCompletedServerEvent]     = jsonFormat0(api.ReleaseCompletedServerEvent)
+    @inline implicit def acquisitionStartedServerEventFormat[I <: UniqueIndexApi](implicit api: I):   RootJsonFormat[api.AcquisitionStartedServerEvent]   = jsonFormat1(api.AcquisitionStartedServerEvent)
+    @inline implicit def acquisitionCompletedServerEventFormat[I <: UniqueIndexApi](implicit api: I): RootJsonFormat[api.AcquisitionCompletedServerEvent] = jsonFormat0(api.AcquisitionCompletedServerEvent)
+    @inline implicit def releaseStartedServerEventFormat[I <: UniqueIndexApi](implicit api: I):       RootJsonFormat[api.ReleaseStartedServerEvent]       = jsonFormat0(api.ReleaseStartedServerEvent)
+    @inline implicit def releaseCompletedServerEventFormat[I <: UniqueIndexApi](implicit api: I):     RootJsonFormat[api.ReleaseCompletedServerEvent]     = jsonFormat0(api.ReleaseCompletedServerEvent)
+  }
 
-  val FreeServerStateName = "FreeServerState"
-  val UnconfirmedServerStateName = "UnconfirmedServerState"
-  val AcquiredServerStateName = "AcquiredServerState"
+  object ServerState {
+    val FreeServerStateName = "FreeServerState"
+    val UnconfirmedServerStateName = "UnconfirmedServerState"
+    val AcquiredServerStateName = "AcquiredServerState"
 
-  @inline implicit def freeServerStateFormat[I <: UniqueIndexApi](implicit api: I):        RootJsonFormat[api.FreeServerState]        = jsonFormat0(api.FreeServerState)
-  @inline implicit def unconfirmedServerStateFormat[I <: UniqueIndexApi](implicit api: I): RootJsonFormat[api.UnconfirmedServerState] = jsonFormat1(api.UnconfirmedServerState)
-  @inline implicit def acquiredServerStateFormat[I <: UniqueIndexApi](implicit api: I):    RootJsonFormat[api.AcquiredServerState]    = jsonFormat1(api.AcquiredServerState)
+    @inline implicit def freeServerStateFormat[I <: UniqueIndexApi](implicit api: I):        RootJsonFormat[api.FreeServerState]        = jsonFormat0(api.FreeServerState)
+    @inline implicit def unconfirmedServerStateFormat[I <: UniqueIndexApi](implicit api: I): RootJsonFormat[api.UnconfirmedServerState] = jsonFormat1(api.UnconfirmedServerState)
+    @inline implicit def acquiredServerStateFormat[I <: UniqueIndexApi](implicit api: I):    RootJsonFormat[api.AcquiredServerState]    = jsonFormat1(api.AcquiredServerState)
+  }
 
   val AcquisitionPendingClientStateName = "AcquisitionPendingClientState"
   val ReleasePendingClientStateName     = "ReleasePendingClientState"
@@ -113,22 +122,92 @@ private object JsonHelper {
     }
   }
 
-  val GetEntityIdName         = "GetEntityId"
-  val StartAcquisitionName    = "StartAcquisition"
-  val CommitAcquisitionName   = "CommitAcquisition"
-  val RollbackAcquisitionName = "RollbackAcquisition"
-  val StartReleaseName        = "StartRelease"
-  val CommitReleaseName       = "CommitRelease"
-  val RollbackReleaseName     = "RollbackRelease"
+  class Requests(implicit jf: JsonFormat[SerializedProgramContext]) {
+    val GetEntityIdName         = "GetEntityId"
+    val StartAcquisitionName    = "StartAcquisition"
+    val CommitAcquisitionName   = "CommitAcquisition"
+    val RollbackAcquisitionName = "RollbackAcquisition"
+    val StartReleaseName        = "StartRelease"
+    val CommitReleaseName       = "CommitRelease"
+    val RollbackReleaseName     = "RollbackRelease"
 
-  @inline implicit def getEntityIdFormat[I <: UniqueIndexApi](implicit api: I):         RootJsonFormat[api.GetEntityId]         = jsonFormat1(api.GetEntityId)
-  @inline implicit def startAcquisitionFormat[I <: UniqueIndexApi](implicit api: I):    RootJsonFormat[api.StartAcquisition]    = jsonFormat2(api.StartAcquisition)
-  @inline implicit def commitAcquisitionFormat[I <: UniqueIndexApi](implicit api: I):   RootJsonFormat[api.CommitAcquisition]   = jsonFormat2(api.CommitAcquisition)
-  @inline implicit def rollbackAcquisitionFormat[I <: UniqueIndexApi](implicit api: I): RootJsonFormat[api.RollbackAcquisition] = jsonFormat2(api.RollbackAcquisition)
-  @inline implicit def startReleaseFormat[I <: UniqueIndexApi](implicit api: I):        RootJsonFormat[api.StartRelease]        = jsonFormat2(api.StartRelease)
-  @inline implicit def commitReleaseFormat[I <: UniqueIndexApi](implicit api: I):       RootJsonFormat[api.CommitRelease]       = jsonFormat2(api.CommitRelease)
-  @inline implicit def rollbackReleaseFormat[I <: UniqueIndexApi](implicit api: I):     RootJsonFormat[api.RollbackRelease]     = jsonFormat2(api.RollbackRelease)
+    @inline implicit def getEntityIdFormat[I <: UniqueIndexApi](implicit api: I): RootJsonFormat[api.GetEntityId] = new RootJsonFormat[api.GetEntityId] {
+      override def read(json: JsValue): api.GetEntityId = {
+        val fields = json.asJsObject.fields
+        implicit val context = fields("context").convertTo[SerializedProgramContext]
+        api.GetEntityId(fields("key").convertTo[api.KeyType])
+      }
+      override def write(obj: api.GetEntityId): JsValue = {
+        JsObject("key" -> obj.key.toJson, "context" -> obj.context.toJson)
+      }
+    }
 
+    @inline implicit def startAcquisitionFormat[I <: UniqueIndexApi](implicit api: I): RootJsonFormat[api.StartAcquisition] = new RootJsonFormat[api.StartAcquisition] {
+      override def read(json: JsValue): api.StartAcquisition = {
+        val fields = json.asJsObject.fields
+        implicit val context = fields("context").convertTo[SerializedProgramContext]
+        api.StartAcquisition(fields("entityId").convertTo[api.EntityIdType], fields("key").convertTo[api.KeyType])
+      }
+      override def write(obj: api.StartAcquisition): JsValue = {
+        JsObject("entityId" ->obj.entityId.toJson, "key" -> obj.key.toJson, "context" -> obj.context.toJson)
+      }
+    }
+
+    @inline implicit def commitAcquisitionFormat[I <: UniqueIndexApi](implicit api: I): RootJsonFormat[api.CommitAcquisition] = new RootJsonFormat[api.CommitAcquisition] {
+      override def read(json: JsValue): api.CommitAcquisition = {
+        val fields = json.asJsObject.fields
+        implicit val context = fields("context").convertTo[SerializedProgramContext]
+        api.CommitAcquisition(fields("entityId").convertTo[api.EntityIdType], fields("key").convertTo[api.KeyType])
+      }
+      override def write(obj: api.CommitAcquisition): JsValue = {
+        JsObject("entityId" ->obj.entityId.toJson, "key" -> obj.key.toJson, "context" -> obj.context.toJson)
+      }
+    }
+
+    @inline implicit def rollbackAcquisitionFormat[I <: UniqueIndexApi](implicit api: I): RootJsonFormat[api.RollbackAcquisition] = new RootJsonFormat[api.RollbackAcquisition] {
+      override def read(json: JsValue): api.RollbackAcquisition = {
+        val fields = json.asJsObject.fields
+        implicit val context = fields("context").convertTo[SerializedProgramContext]
+        api.RollbackAcquisition(fields("entityId").convertTo[api.EntityIdType], fields("key").convertTo[api.KeyType])
+      }
+      override def write(obj: api.RollbackAcquisition): JsValue = {
+        JsObject("entityId" ->obj.entityId.toJson, "key" -> obj.key.toJson, "context" -> obj.context.toJson)
+      }
+    }
+
+    @inline implicit def startReleaseFormat[I <: UniqueIndexApi](implicit api: I): RootJsonFormat[api.StartRelease] = new RootJsonFormat[api.StartRelease] {
+      override def read(json: JsValue): api.StartRelease = {
+        val fields = json.asJsObject.fields
+        implicit val context = fields("context").convertTo[SerializedProgramContext]
+        api.StartRelease(fields("entityId").convertTo[api.EntityIdType], fields("key").convertTo[api.KeyType])
+      }
+      override def write(obj: api.StartRelease): JsValue = {
+        JsObject("entityId" ->obj.entityId.toJson, "key" -> obj.key.toJson, "context" -> obj.context.toJson)
+      }
+    }
+
+    @inline implicit def commitReleaseFormat[I <: UniqueIndexApi](implicit api: I): RootJsonFormat[api.CommitRelease] = new RootJsonFormat[api.CommitRelease] {
+      override def read(json: JsValue): api.CommitRelease = {
+        val fields = json.asJsObject.fields
+        implicit val context = fields("context").convertTo[SerializedProgramContext]
+        api.CommitRelease(fields("entityId").convertTo[api.EntityIdType], fields("key").convertTo[api.KeyType])
+      }
+      override def write(obj: api.CommitRelease): JsValue = {
+        JsObject("entityId" ->obj.entityId.toJson, "key" -> obj.key.toJson, "context" -> obj.context.toJson)
+      }
+    }
+
+    @inline implicit def rollbackReleaseFormat[I <: UniqueIndexApi](implicit api: I): RootJsonFormat[api.RollbackRelease] = new RootJsonFormat[api.RollbackRelease] {
+      override def read(json: JsValue): api.RollbackRelease = {
+        val fields = json.asJsObject.fields
+        implicit val context = fields("context").convertTo[SerializedProgramContext]
+        api.RollbackRelease(fields("entityId").convertTo[api.EntityIdType], fields("key").convertTo[api.KeyType])
+      }
+      override def write(obj: api.RollbackRelease): JsValue = {
+        JsObject("entityId" ->obj.entityId.toJson, "key" -> obj.key.toJson, "context" -> obj.context.toJson)
+      }
+    }
+  }
 }
 
 object Json extends DefaultJsonProtocol {
@@ -146,6 +225,8 @@ object Json extends DefaultJsonProtocol {
   }
 
   implicit def clientEventFormat(implicit mirror: Mirror): RootJsonFormat[UniqueIndexApi#ClientEvent] = new RootJsonFormat[UniqueIndexApi#ClientEvent] {
+    import ClientEvents._
+
     override def read(json: JsValue): UniqueIndexApi#ClientEvent = {
       val fields = json.asJsObject.fields
       val value = fields("value")
@@ -224,6 +305,8 @@ object Json extends DefaultJsonProtocol {
   }
 
   implicit def errorFormat(implicit mirror: Mirror): RootJsonFormat[UniqueIndexApi#Error] = new RootJsonFormat[UniqueIndexApi#Error] {
+    import Errors._
+
     override def read(json: JsValue): UniqueIndexApi#Error = {
       val fields = json.asJsObject.fields
       val value = fields("value")
@@ -260,6 +343,8 @@ object Json extends DefaultJsonProtocol {
   }
 
   implicit def serverEventFormat(implicit mirror: Mirror): RootJsonFormat[UniqueIndexApi#ServerEvent] = new RootJsonFormat[UniqueIndexApi#ServerEvent] {
+    import ServerEvents._
+
     override def read(json: JsValue): UniqueIndexApi#ServerEvent = {
       val fields = json.asJsObject.fields
       val value = fields("value")
@@ -299,6 +384,8 @@ object Json extends DefaultJsonProtocol {
   }
 
   implicit def serverStateFormat(implicit mirror: Mirror): RootJsonFormat[UniqueIndexApi#UniqueIndexServerState] = new RootJsonFormat[UniqueIndexApi#UniqueIndexServerState] {
+    import ServerState._
+
     override def read(json: JsValue): UniqueIndexApi#UniqueIndexServerState = {
       val fields = json.asJsObject.fields
       val value = fields("value")
@@ -332,7 +419,10 @@ object Json extends DefaultJsonProtocol {
     }
   }
 
-  implicit def uniqueIndexRequestFormat(implicit mirror: Mirror): RootJsonFormat[UniqueIndexApi#ConcreteUniqueIndexRequest[_]] = new RootJsonFormat[UniqueIndexApi#ConcreteUniqueIndexRequest[_]] {
+  implicit def uniqueIndexRequestFormat(implicit mirror: Mirror, jf: JsonFormat[SerializedProgramContext]): RootJsonFormat[UniqueIndexApi#ConcreteUniqueIndexRequest[_]] = new RootJsonFormat[UniqueIndexApi#ConcreteUniqueIndexRequest[_]] {
+    private val requests = new Requests
+    import requests._
+
     override def read(json: JsValue): UniqueIndexApi#ConcreteUniqueIndexRequest[_] = {
       val fields = json.asJsObject.fields
       val value = fields("value")

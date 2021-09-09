@@ -3,6 +3,7 @@ package io.digitalmagic.akka.dsl
 import akka.actor.{ActorRef, ActorSelection}
 import akka.pattern.ask
 import akka.util.Timeout
+import io.digitalmagic.akka.dsl.context.SerializedProgramContext
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
@@ -21,6 +22,10 @@ object API {
 
   trait Response[T] extends Product with Serializable {
     def value: Either[ResponseError, T]
+  }
+
+  trait HasContext {
+    def context: SerializedProgramContext
   }
 
   trait Request[T] extends Product with Serializable {
