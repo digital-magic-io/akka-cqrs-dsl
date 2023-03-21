@@ -217,12 +217,17 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
       throw new RuntimeException("failed to process snapshot")
   }
 
+  protected def preprocessEventsOnPersist(events: Events): Events = events
+
+  protected def preprocessEventOnRestore(event: EventType): Events = Vector(event)
+
   abstract override def receiveRecoverEvent: Receive = super.receiveRecoverEvent orElse {
     case event: UniqueIndexApi#ClientEvent =>
       processIndexEvent(event)
 
     case event: EventType =>
-      state = state.copy(underlying = persistentState.process(state.underlying, event))
+      val events = preprocessEventOnRestore(event)
+      state = state.copy(underlying = events.foldLeft(state.underlying)(persistentState.process))
   }
 
   abstract override def receiveRecoverRecoveryComplete(): Unit = {
@@ -262,7 +267,7 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
   private def commit(events: Events, postActions: IndexPostActions)(completion: () => Unit): Unit = {
     val indexEvents = postActions.commitEvents
 
-    persistEvents(events ++ indexEvents)(
+    persistEvents(preprocessEventsOnPersist(events) ++ indexEvents)(
       handler = {
         case event: UniqueIndexApi#ClientEvent =>
           processIndexEvent(event)
