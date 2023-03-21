@@ -20,7 +20,7 @@ val scala213Options = scala212Options.filterNot(_ == "-Ypartial-unification")
 
 val buildSettings = Seq(
   organization := "io.digital-magic",
-  version      := "2.2.0",
+  version      := "2.2.1",
   Test / parallelExecution := false,
   scalaVersion       := Dependencies.Versions.scala_2_12,
   crossScalaVersions := Seq(Dependencies.Versions.scala_2_12, Dependencies.Versions.scala_2_13),
