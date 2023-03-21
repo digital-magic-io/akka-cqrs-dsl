@@ -21,6 +21,9 @@ trait EventSourcedPrograms extends EventSourced {
   def getProgram: Request ~> MaybeProgram
   def processSnapshot(s: Any): Option[State]
 
+  protected def preprocessEventsOnPersist(events: Events): Events = events
+  protected def preprocessEventOnRestore(event: EventType): Events = Vector(event)
+  
   type QueryList <: TListK
   type QueryAlgebra[A] = CopK[QueryList, A]
   protected val algebraIsQuery: IsQuery[QueryAlgebra]

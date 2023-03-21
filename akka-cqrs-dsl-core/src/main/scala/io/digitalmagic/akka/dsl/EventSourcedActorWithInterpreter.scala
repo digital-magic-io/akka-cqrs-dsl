@@ -217,10 +217,6 @@ trait EventSourcedActorWithInterpreter extends DummyActor with MonadTellExtras w
       throw new RuntimeException("failed to process snapshot")
   }
 
-  protected def preprocessEventsOnPersist(events: Events): Events = events
-
-  protected def preprocessEventOnRestore(event: EventType): Events = Vector(event)
-
   abstract override def receiveRecoverEvent: Receive = super.receiveRecoverEvent orElse {
     case event: UniqueIndexApi#ClientEvent =>
       processIndexEvent(event)
